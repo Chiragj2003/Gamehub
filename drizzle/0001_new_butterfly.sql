@@ -1,0 +1,1 @@
+ALTER TABLE "game_analytics" ADD COLUMN "player_name" varchar(255);
