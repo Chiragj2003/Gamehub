@@ -7,17 +7,21 @@ import { startGameSession, endAndTrackSession } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import ScoreSubmit from "./ScoreSubmit";
+
 interface GameScreenProps {
   gameId: number;
   gameTitle: string;
   gameSlug: string;
 }
 
-export default function GameScreen({ gameId, gameTitle }: GameScreenProps) {
+export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenProps) {
   const [mounted, setMounted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [timer, setTimer] = useState(0);
+  const [score, setScore] = useState(0);
+  const [showScoreModal, setShowScoreModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -47,15 +51,36 @@ export default function GameScreen({ gameId, gameTitle }: GameScreenProps) {
     return () => clearInterval(interval);
   }, [isPlaying]);
 
+  // Listen to messages from iframe for game over
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === "game-over") {
+        const finalScore = Number(event.data.score) || 0;
+        setScore(finalScore);
+        if (sessionId) {
+          endAndTrackSession(sessionId, true, finalScore).catch(err =>
+            console.warn("Failed to end telemetry session:", err)
+          );
+          setSessionId(null);
+        }
+        setShowScoreModal(true);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [sessionId]);
+
   const handlePlay = () => {
     const sId = startGameSession(gameId);
     setSessionId(sId);
+    setScore(0);
     setIsPlaying(true);
   };
 
   const handleEndGame = async () => {
     if (sessionId) {
-      await endAndTrackSession(sessionId, true, Math.floor(Math.random() * 500) + 100); // mock score
+      await endAndTrackSession(sessionId, true, score);
       setSessionId(null);
     }
     setIsPlaying(false);
@@ -124,20 +149,36 @@ export default function GameScreen({ gameId, gameTitle }: GameScreenProps) {
         </div>
       </div>
 
-      {/* Frame placeholder */}
+      {/* Frame container */}
       <div className="flex-1 bg-zinc-950 flex flex-col items-center justify-center relative">
-        {/* We use a sandboxed dummy page/iframe placeholder for now */}
         <iframe
-          src="about:blank"
+          src={`/games/${gameSlug}/embed`}
           title={`${gameTitle} Play Area`}
           className="w-full h-full border-0 absolute inset-0 z-10 bg-zinc-950"
         />
         {/* Loading Overlay behind iframe */}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center p-4">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-neon-violet border-t-transparent" />
-          <p className="text-xs text-zinc-500">Initializing Phaser Engine Context...</p>
+          <p className="text-xs text-zinc-500">Initializing Game Context...</p>
         </div>
       </div>
+
+      {/* Score Submit Modal */}
+      {showScoreModal && (
+        <ScoreSubmit
+          gameId={gameId}
+          gameSlug={gameSlug}
+          score={score}
+          sessionId={sessionId}
+          onClose={() => {
+            setShowScoreModal(false);
+            setIsPlaying(false);
+          }}
+          onSubmitSuccess={() => {
+            // scores reloaded via local-scores-updated event
+          }}
+        />
+      )}
     </div>
   );
 }

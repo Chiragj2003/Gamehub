@@ -106,6 +106,15 @@ export default class SnakeScene extends Phaser.Scene {
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.keys = this.input.keyboard!.addKeys("W,A,S,D,P") as Record<string, Phaser.Input.Keyboard.Key>;
 
+    // Prevent default browser scrolling behavior for standard game keys
+    this.input.keyboard!.addCapture([
+      Phaser.Input.Keyboard.KeyCodes.UP,
+      Phaser.Input.Keyboard.KeyCodes.DOWN,
+      Phaser.Input.Keyboard.KeyCodes.LEFT,
+      Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      Phaser.Input.Keyboard.KeyCodes.SPACE
+    ]);
+
     // Neon Spark Particles
     this.particles = this.add.particles(0, 0, "spark", {
       speed: { min: 50, max: 150 },

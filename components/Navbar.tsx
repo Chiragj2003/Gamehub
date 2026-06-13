@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -12,17 +12,39 @@ import SearchBar from "@/components/SearchBar";
 import { Volume2 } from "lucide-react";
 import AudioSettings from "@/components/AudioSettings";
 
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
+import AuthModal from "@/components/AuthModal";
+import UserMenu from "@/components/UserMenu";
+
 
 export default function Navbar() {
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
   const [audioOpen, setAudioOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
 
   const navItems = [
     { name: "Games", href: "/", icon: GamepadIcon },
     { name: "Library", href: "/library", icon: StarIcon },
-    { name: "Leaderboards", href: "/leaderboards", icon: Trophy },
+    { name: "Leaderboards", href: "/leaderboard", icon: Trophy },
     { name: "Premium", href: "/premium", icon: SparklesIcon },
   ];
 
@@ -104,14 +126,21 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* Profile Avatar Trigger (Mockup) */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full border border-white/5 hover:border-neon-violet/30 hover:bg-zinc-950/60 transition-all"
-            >
-              <HugeiconsIcon icon={UserCircleIcon} className="h-5 w-5 text-zinc-400 hover:text-neon-violet transition-colors" />
-            </Button>
+            {/* Profile Avatar Trigger */}
+            {user ? (
+              <UserMenu user={user} />
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setAuthOpen(true)}
+                className="rounded-full border border-white/5 hover:border-neon-violet/30 hover:bg-zinc-950/60 transition-all cursor-pointer"
+              >
+                <HugeiconsIcon icon={UserCircleIcon} className="h-5 w-5 text-zinc-400 hover:text-neon-violet transition-colors" />
+              </Button>
+            )}
+
+            <AuthModal isOpen={authOpen} onOpenChange={setAuthOpen} />
 
 
             {/* Mobile Navigation Drawer */}

@@ -39,4 +39,4 @@ export {
   updateGameAnalyticsDuration,
   FALLBACK_GAMES
 } from "./db-queries";
-export { type Game } from "../db";
+export { type Game } from "./db-queries";

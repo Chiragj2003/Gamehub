@@ -39,6 +39,8 @@ export default class SpaceDefenderScene extends Phaser.Scene {
   // Particles
   private explosionEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
 
+  private spaceKey!: Phaser.Input.Keyboard.Key;
+
   constructor() {
     super("SpaceDefenderScene");
   }
@@ -194,14 +196,17 @@ export default class SpaceDefenderScene extends Phaser.Scene {
       }
     });
 
-    // Tap or space to fire (autofire is also enabled)
-    this.input.on("pointerdown", () => {
-      this.firePlayerLaser();
-    });
+    // Initialize space key binding
+    this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-    this.input.keyboard!.on("keydown-SPACE", () => {
-      this.firePlayerLaser();
-    });
+    // Prevent default browser scrolling behavior for standard game keys
+    this.input.keyboard!.addCapture([
+      Phaser.Input.Keyboard.KeyCodes.UP,
+      Phaser.Input.Keyboard.KeyCodes.DOWN,
+      Phaser.Input.Keyboard.KeyCodes.LEFT,
+      Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      Phaser.Input.Keyboard.KeyCodes.SPACE
+    ]);
 
     // Collisions setup
     // 1. Player laser hitting enemies
@@ -261,8 +266,11 @@ export default class SpaceDefenderScene extends Phaser.Scene {
     // Draw active bubble shield if applicable
     this.updateShieldGraphic();
 
-    // Auto firing player lasers when mouse is down or simply continuously
-    if (time > this.nextFire) {
+    // Firing player lasers when mouse/pointer is down or space key is pressed
+    const isPointerDown = this.input.activePointer.isDown;
+    const isSpaceKeyDown = this.spaceKey && this.spaceKey.isDown;
+
+    if ((isPointerDown || isSpaceKeyDown) && time > this.nextFire) {
       const actualCooldown = this.isRapidFire ? this.fireRate / 2 : this.fireRate;
       this.nextFire = time + actualCooldown;
       this.firePlayerLaser();
