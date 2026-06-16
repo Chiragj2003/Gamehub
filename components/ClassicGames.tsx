@@ -2006,7 +2006,7 @@ export const ClassicMemoryMatch: React.FC<GameProps> = ({ onGameOver }) => {
   return (
     <div className="w-full h-full bg-zinc-950 flex flex-col items-center justify-center p-6 select-none font-sans">
       {/* HUD Panel */}
-      <div className="flex items-center justify-between w-full max-w-md mb-6 text-sm text-zinc-400 font-bold uppercase tracking-wider">
+      <div className="flex items-center justify-between w-full max-w-[min(90vw,90vh,400px)] mb-4 sm:mb-6 text-sm text-zinc-400 font-bold uppercase tracking-wider">
         <div>Moves: <span className="font-mono text-white text-base">{moves}</span></div>
         <div>Score: <span className="font-mono text-neon-violet text-glow-violet text-base">{score}</span></div>
         <button
@@ -2018,7 +2018,7 @@ export const ClassicMemoryMatch: React.FC<GameProps> = ({ onGameOver }) => {
       </div>
 
       {/* 4x4 Cards Grid */}
-      <div className="grid grid-cols-4 gap-4 w-full max-w-md aspect-square">
+      <div className="grid grid-cols-4 gap-2 sm:gap-4 w-[min(90vw,60vh,400px)] h-[min(90vw,60vh,400px)]">
         {cards.map((card, idx) => {
           const isFlipped = card.flipped || card.matched;
           const bgStyle = card.matched 
@@ -2528,4 +2528,459 @@ export const Classic2048: React.FC<GameProps> = ({ onGameOver }) => {
       </div>
     </div>
   );
+};
+
+// ----------------------------------------------------
+// 13. HANGMAN GAME
+// ----------------------------------------------------
+export const ClassicHangman: React.FC<GameProps> = ({ onGameOver }) => {
+  const words = ["REACT", "TYPESCRIPT", "SUPABASE", "NEXTJS", "TAILWIND", "VERCEL", "JAVASCRIPT", "FRONTEND", "DEVELOPER", "GAMES"];
+  const [word, setWord] = useState("");
+  const [guessed, setGuessed] = useState<Set<string>>(new Set());
+  const [mistakes, setMistakes] = useState(0);
+  const maxMistakes = 6;
+  
+  useEffect(() => {
+    setWord(words[Math.floor(Math.random() * words.length)]);
+  }, []);
+
+  const handleGuess = (letter: string) => {
+    if (guessed.has(letter) || mistakes >= maxMistakes) return;
+    const newGuessed = new Set(guessed).add(letter);
+    setGuessed(newGuessed);
+    
+    if (!word.includes(letter)) {
+      const newMistakes = mistakes + 1;
+      setMistakes(newMistakes);
+      if (newMistakes >= maxMistakes) {
+        setTimeout(() => onGameOver(0), 1500); // 0 score for loss
+      }
+    } else {
+      // Check win
+      const isWin = word.split("").every(char => newGuessed.has(char));
+      if (isWin) {
+        setTimeout(() => onGameOver(word.length * 100), 1000);
+      }
+    }
+  };
+
+  const keyboard = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+  return (
+    <div className="w-full h-full bg-zinc-950 flex flex-col items-center justify-center p-6 font-sans">
+      <div className="text-zinc-500 font-bold mb-4 text-xs tracking-widest uppercase">Mistakes: {mistakes} / {maxMistakes}</div>
+      {/* Hangman drawing placeholder - purely visual text art for now */}
+      <div className="font-mono text-white whitespace-pre mb-8 bg-zinc-900/50 p-6 rounded-2xl border border-white/5 shadow-xl">
+        {`  +---+\n  |   |\n  ${mistakes > 0 ? "O" : " "}   |\n ${mistakes > 2 ? "/" : " "}${mistakes > 1 ? "|" : " "}${mistakes > 3 ? "\\" : " "}  |\n ${mistakes > 4 ? "/" : " "} ${mistakes > 5 ? "\\" : " "}  |\n      |\n=========`}
+      </div>
+      
+      <div className="flex gap-3 mb-10">
+        {word.split("").map((char, i) => (
+          <div key={i} className="w-10 h-12 border-b-2 border-white/20 flex items-center justify-center text-2xl font-black text-white">
+            {guessed.has(char) || mistakes >= maxMistakes ? char : ""}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-2 max-w-lg w-full">
+        {keyboard.map(key => {
+          const isGuessed = guessed.has(key);
+          const isCorrect = isGuessed && word.includes(key);
+          const isWrong = isGuessed && !word.includes(key);
+          
+          return (
+            <button
+              key={key}
+              onClick={() => handleGuess(key)}
+              disabled={isGuessed}
+              className={`h-10 rounded-lg font-bold text-xs transition-all ${
+                isCorrect ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50" :
+                isWrong ? "bg-rose-500/10 text-rose-500/50 border border-rose-500/20" :
+                "bg-zinc-900 text-white border border-white/5 hover:bg-zinc-800"
+              }`}
+            >
+              {key}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ----------------------------------------------------
+// 14. ROCK PAPER SCISSORS
+// ----------------------------------------------------
+export const ClassicRockPaperScissors: React.FC<GameProps> = ({ onGameOver }) => {
+  const choices = ["✊", "✋", "✌️"];
+  const names = ["Rock", "Paper", "Scissors"];
+  const [playerChoice, setPlayerChoice] = useState<number | null>(null);
+  const [cpuChoice, setCpuChoice] = useState<number | null>(null);
+  const [result, setResult] = useState<string>("");
+  const [score, setScore] = useState(0);
+
+  const play = (choice: number) => {
+    if (result !== "") return;
+    setPlayerChoice(choice);
+    
+    // Animate cpu choice briefly
+    let ticks = 0;
+    const interval = setInterval(() => {
+      setCpuChoice(Math.floor(Math.random() * 3));
+      ticks++;
+      if (ticks > 10) {
+        clearInterval(interval);
+        const finalCpu = Math.floor(Math.random() * 3);
+        setCpuChoice(finalCpu);
+        
+        // Determine winner
+        if (choice === finalCpu) {
+          setResult("DRAW");
+          setTimeout(() => { resetRound() }, 1500);
+        } else if (
+          (choice === 0 && finalCpu === 2) ||
+          (choice === 1 && finalCpu === 0) ||
+          (choice === 2 && finalCpu === 1)
+        ) {
+          setResult("YOU WIN");
+          setScore(s => s + 100);
+          setTimeout(() => { resetRound() }, 1500);
+        } else {
+          setResult("CPU WINS");
+          setTimeout(() => onGameOver(score), 2000);
+        }
+      }
+    }, 50);
+  };
+
+  const resetRound = () => {
+    setPlayerChoice(null);
+    setCpuChoice(null);
+    setResult("");
+  };
+
+  return (
+    <div className="w-full h-full bg-zinc-950 flex flex-col items-center justify-center p-6 font-sans">
+      <div className="text-neon-pink font-mono text-xl mb-12 text-glow-pink">SCORE: {score}</div>
+      
+      <div className="flex w-full max-w-lg justify-between items-center mb-16">
+        <div className="flex flex-col items-center gap-4">
+          <div className="text-zinc-500 font-bold text-xs uppercase tracking-widest">You</div>
+          <div className="w-32 h-32 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center text-6xl shadow-2xl">
+            {playerChoice !== null ? choices[playerChoice] : "?"}
+          </div>
+        </div>
+        
+        <div className="text-3xl font-black text-zinc-700 italic">VS</div>
+        
+        <div className="flex flex-col items-center gap-4">
+          <div className="text-zinc-500 font-bold text-xs uppercase tracking-widest">CPU</div>
+          <div className="w-32 h-32 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center text-6xl shadow-2xl">
+            {cpuChoice !== null ? choices[cpuChoice] : "?"}
+          </div>
+        </div>
+      </div>
+
+      <div className="h-8 mb-8 text-2xl font-black text-white tracking-widest">{result}</div>
+
+      <div className="flex gap-4">
+        {choices.map((c, i) => (
+          <button
+            key={i}
+            onClick={() => play(i)}
+            disabled={result !== ""}
+            className="group relative flex flex-col items-center gap-2 p-4 bg-zinc-900 border border-white/10 rounded-xl hover:bg-white/5 hover:border-white/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="text-4xl group-hover:scale-110 transition-transform">{c}</span>
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{names[i]}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ----------------------------------------------------
+// 15. TYPING SPEED TEST
+// ----------------------------------------------------
+export const ClassicTypingTest: React.FC<GameProps> = ({ onGameOver }) => {
+  const quote = "The quick brown fox jumps over the lazy dog. A journey of a thousand miles begins with a single step. To be or not to be, that is the question.";
+  const [input, setInput] = useState("");
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [wpm, setWpm] = useState(0);
+  const [isDone, setIsDone] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isDone) return;
+    const val = e.target.value;
+    if (!startTime && val.length > 0) {
+      setStartTime(Date.now());
+    }
+    setInput(val);
+
+    if (val === quote) {
+      // Done
+      setIsDone(true);
+      const timeSec = (Date.now() - (startTime || Date.now())) / 1000;
+      const words = quote.split(" ").length;
+      const finalWpm = Math.round((words / timeSec) * 60);
+      setWpm(finalWpm);
+      setTimeout(() => onGameOver(finalWpm * 10), 3000); // Score = WPM * 10
+    }
+  };
+
+  return (
+    <div className="w-full h-full bg-zinc-950 flex flex-col items-center justify-center p-6 font-sans">
+      <div className="max-w-2xl w-full">
+        <div className="mb-8 flex justify-between items-end">
+          <h2 className="text-2xl font-black text-white tracking-tight">Speed Test</h2>
+          {isDone && <div className="text-neon-green font-mono text-2xl text-glow-green animate-pulse">{wpm} WPM</div>}
+        </div>
+        
+        <div className="relative text-2xl leading-relaxed font-mono text-zinc-600 mb-8 select-none tracking-tight">
+          {quote.split("").map((char, i) => {
+            let color = "text-zinc-600";
+            if (i < input.length) {
+              color = input[i] === char ? "text-white" : "text-rose-500 bg-rose-500/20 rounded-sm";
+            }
+            return <span key={i} className={color}>{char}</span>;
+          })}
+        </div>
+
+        <input
+          type="text"
+          value={input}
+          onChange={handleChange}
+          disabled={isDone}
+          autoFocus
+          className="w-full bg-zinc-900 border border-white/10 rounded-xl p-4 text-white font-mono text-lg focus:outline-none focus:border-neon-cyan focus:ring-1 focus:ring-neon-cyan transition-all"
+          placeholder="Start typing..."
+        />
+      </div>
+    </div>
+  );
+};
+
+// ----------------------------------------------------
+// 16. CHROME DINO GAME
+// ----------------------------------------------------
+export const ClassicDino: React.FC<GameProps> = ({ onGameOver }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animId: number;
+    let isGameOver = false;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // Dino
+    let dy = h - 60;
+    let dvy = 0;
+    const gravity = 0.6;
+    const jumpPower = -12;
+    let isJumping = false;
+    
+    // Cactus
+    interface Cactus { x: number; w: number; h: number; passed: boolean }
+    let cacti: Cactus[] = [];
+    let speed = 6;
+    let score = 0;
+    let spawnTimer = 0;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ([" ", "ArrowUp"].includes(e.key)) {
+        e.preventDefault();
+        if (!isJumping && !isGameOver) {
+          dvy = jumpPower;
+          isJumping = true;
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
+    const update = () => {
+      // Physics
+      dvy += gravity;
+      dy += dvy;
+      if (dy >= h - 60) {
+        dy = h - 60;
+        dvy = 0;
+        isJumping = false;
+      }
+
+      // Cacti
+      spawnTimer++;
+      if (spawnTimer > 100 - speed * 2) {
+        spawnTimer = 0;
+        cacti.push({
+          x: w,
+          w: 20 + Math.random() * 20,
+          h: 40 + Math.random() * 40,
+          passed: false
+        });
+      }
+
+      for (let i = 0; i < cacti.length; i++) {
+        let c = cacti[i];
+        c.x -= speed;
+
+        // Collision
+        if (
+          100 < c.x + c.w &&
+          140 > c.x &&
+          dy < h - 60 + c.h &&
+          dy + 40 > h - c.h
+        ) {
+          isGameOver = true;
+          cancelAnimationFrame(animId);
+          ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+          ctx.fillRect(0, 0, w, h);
+          setTimeout(() => onGameOver(score), 1500);
+          return;
+        }
+
+        if (!c.passed && c.x < 100) {
+          c.passed = true;
+          score += 10;
+          if (score % 100 === 0) speed += 0.5;
+        }
+      }
+      cacti = cacti.filter(c => c.x + c.w > 0);
+
+      // Draw
+      ctx.fillStyle = "#09090b";
+      ctx.fillRect(0, 0, w, h);
+
+      // Ground
+      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.beginPath();
+      ctx.moveTo(0, h - 20);
+      ctx.lineTo(w, h - 20);
+      ctx.stroke();
+
+      // Score
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.font = "bold 24px monospace";
+      ctx.fillText(\`SCORE: \${score}\`, 20, 40);
+
+      // Dino
+      ctx.fillStyle = "#3b82f6";
+      ctx.fillRect(100, dy - 40, 40, 40);
+
+      // Cacti
+      ctx.fillStyle = "#10b981";
+      cacti.forEach(c => {
+        ctx.fillRect(c.x, h - 20 - c.h, c.w, c.h);
+      });
+
+      if (!isGameOver) animId = requestAnimationFrame(update);
+    };
+
+    if (!isGameOver) animId = requestAnimationFrame(update);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      cancelAnimationFrame(animId);
+    };
+  }, [onGameOver]);
+
+  return <canvas ref={canvasRef} width={800} height={400} className="w-full max-w-3xl aspect-[2/1] block bg-zinc-950 rounded-xl" />;
+};
+
+// ----------------------------------------------------
+// 17. BALANCE GAME
+// ----------------------------------------------------
+export const ClassicBalance: React.FC<GameProps> = ({ onGameOver }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animId: number;
+    let isGameOver = false;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    let angle = 0;
+    let velocity = 0;
+    let playerMove = 0;
+    let score = 0;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") playerMove = -0.05;
+      if (e.key === "ArrowRight") playerMove = 0.05;
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" && playerMove < 0) playerMove = 0;
+      if (e.key === "ArrowRight" && playerMove > 0) playerMove = 0;
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    const update = () => {
+      score++;
+      
+      // Wind / instability
+      velocity += (Math.random() - 0.5) * 0.005;
+      velocity += playerMove;
+      
+      // Gravity pulls it down more if it's already leaning
+      velocity += angle * 0.02;
+      
+      angle += velocity;
+
+      if (Math.abs(angle) > Math.PI / 3) {
+        isGameOver = true;
+        cancelAnimationFrame(animId);
+        ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+        ctx.fillRect(0, 0, w, h);
+        setTimeout(() => onGameOver(score), 1500);
+        return;
+      }
+
+      ctx.fillStyle = "#09090b";
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.font = "bold 24px monospace";
+      ctx.fillText(\`SCORE: \${score}\`, 20, 40);
+
+      // Draw Fulcrum
+      ctx.fillStyle = "#52525b";
+      ctx.beginPath();
+      ctx.moveTo(w / 2, h - 50);
+      ctx.lineTo(w / 2 - 20, h);
+      ctx.lineTo(w / 2 + 20, h);
+      ctx.fill();
+
+      // Draw Platform
+      ctx.translate(w / 2, h - 50);
+      ctx.rotate(angle);
+      ctx.fillStyle = "#3b82f6";
+      ctx.fillRect(-150, -10, 300, 20);
+      ctx.rotate(-angle);
+      ctx.translate(-w / 2, -(h - 50));
+
+      if (!isGameOver) animId = requestAnimationFrame(update);
+    };
+
+    if (!isGameOver) animId = requestAnimationFrame(update);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      cancelAnimationFrame(animId);
+    };
+  }, [onGameOver]);
+
+  return <canvas ref={canvasRef} width={800} height={400} className="w-full max-w-3xl aspect-[2/1] block bg-zinc-950 rounded-xl" />;
 };

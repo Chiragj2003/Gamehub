@@ -15,6 +15,11 @@ const ClassicMemoryMatch = dynamic(() => import("@/components/ClassicGames").the
 const ClassicConnectFour = dynamic(() => import("@/components/ClassicGames").then(mod => mod.ClassicConnectFour), { ssr: false });
 const ClassicTicTacToe = dynamic(() => import("@/components/ClassicGames").then(mod => mod.ClassicTicTacToe), { ssr: false });
 const Classic2048 = dynamic(() => import("@/components/ClassicGames").then(mod => mod.Classic2048), { ssr: false });
+const ClassicHangman = dynamic(() => import("@/components/ClassicGames").then(mod => mod.ClassicHangman), { ssr: false });
+const ClassicRockPaperScissors = dynamic(() => import("@/components/ClassicGames").then(mod => mod.ClassicRockPaperScissors), { ssr: false });
+const ClassicDino = dynamic(() => import("@/components/ClassicGames").then(mod => mod.ClassicDino), { ssr: false });
+const ClassicTypingTest = dynamic(() => import("@/components/ClassicGames").then(mod => mod.ClassicTypingTest), { ssr: false });
+const ClassicBalance = dynamic(() => import("@/components/ClassicGames").then(mod => mod.ClassicBalance), { ssr: false });
 
 interface GameEmbedClientProps {
   slug: string;
@@ -69,6 +74,16 @@ export default function GameEmbedClient({ slug }: GameEmbedClientProps) {
         return <ClassicTicTacToe onGameOver={onGameOver} />;
       case "2048":
         return <Classic2048 onGameOver={onGameOver} />;
+      case "hangman":
+        return <ClassicHangman onGameOver={onGameOver} />;
+      case "rock-paper-scissors":
+        return <ClassicRockPaperScissors onGameOver={onGameOver} />;
+      case "dino":
+        return <ClassicDino onGameOver={onGameOver} />;
+      case "typing-test":
+        return <ClassicTypingTest onGameOver={onGameOver} />;
+      case "balance":
+        return <ClassicBalance onGameOver={onGameOver} />;
       default:
         return (
           <div className="flex h-screen w-screen items-center justify-center bg-zinc-950 text-zinc-500 font-bold uppercase tracking-wider text-xs">

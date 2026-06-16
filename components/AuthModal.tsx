@@ -58,22 +58,6 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
     }
   };
 
-  const handleOAuthLogin = async (provider: "google" | "github") => {
-    setError(null);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-      if (error) throw error;
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "OAuth initiation failed.";
-      setError(message);
-    }
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="border-white/5 bg-zinc-950/95 backdrop-blur-xl p-8 max-w-md rounded-2xl shadow-2xl">
@@ -146,31 +130,6 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
             <HugeiconsIcon icon={ArrowRight01Icon} className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </Button>
         </form>
-
-        <div className="relative flex py-2 items-center">
-          <div className="flex-grow border-t border-white/5"></div>
-          <span className="flex-shrink mx-4 text-[9px] text-zinc-600 font-bold uppercase tracking-wider">Or continue with</span>
-          <div className="flex-grow border-t border-white/5"></div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => handleOAuthLogin("google")}
-            className="h-10 rounded-full border-white/10 hover:bg-zinc-900/60 font-semibold text-xs tracking-wider cursor-pointer"
-          >
-            Google
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => handleOAuthLogin("github")}
-            className="h-10 rounded-full border-white/10 hover:bg-zinc-900/60 font-semibold text-xs tracking-wider cursor-pointer"
-          >
-            GitHub
-          </Button>
-        </div>
 
         <p className="text-center text-[10px] text-zinc-500 font-medium pt-3">
           {isSignUp ? "Already have an account?" : "Need an account?"}{" "}
