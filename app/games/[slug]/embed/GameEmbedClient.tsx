@@ -28,6 +28,11 @@ export default function GameEmbedClient({ slug }: GameEmbedClientProps) {
   }, []);
 
   useEffect(() => {
+    // Automatically grab focus so controls work without needing a manual click
+    if (typeof window !== "undefined") {
+      window.focus();
+    }
+
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // Prevent default scrolling for Space and Arrow keys inside the game iframe
       if ([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
