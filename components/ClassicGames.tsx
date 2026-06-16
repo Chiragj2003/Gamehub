@@ -1901,7 +1901,7 @@ export const ClassicMemoryMatch: React.FC<GameProps> = ({ onGameOver }) => {
           // Check Win Condition
           if (newCards.every(c => c.matched)) {
             // Victory
-            isGameOver = true; onGameOver(score + 1000 - moves * 20);
+            onGameOver(score + 1000 - moves * 20);
           }
         }, 600);
       } else {
@@ -2016,7 +2016,7 @@ export const ClassicConnectFour: React.FC<GameProps> = ({ onGameOver }) => {
     setBoard(newBoard);
 
     if (checkWin(newBoard, 1)) {
-      isGameOver = true; onGameOver(500); // victory
+      onGameOver(500); // victory
       return;
     }
 
@@ -2035,7 +2035,7 @@ export const ClassicConnectFour: React.FC<GameProps> = ({ onGameOver }) => {
 
         if (validCols.length === 0) {
           // Draw
-          isGameOver = true; onGameOver(100);
+          onGameOver(100);
           return;
         }
 
@@ -2077,7 +2077,7 @@ export const ClassicConnectFour: React.FC<GameProps> = ({ onGameOver }) => {
         setBoard(newBoard);
 
         if (checkWin(newBoard, 2)) {
-          isGameOver = true; onGameOver(50); // Loss
+          onGameOver(50); // Loss
           return;
         }
 
@@ -2158,12 +2158,12 @@ export const ClassicTicTacToe: React.FC<GameProps> = ({ onGameOver }) => {
 
     const winner = checkWinner(newBoard);
     if (winner) {
-      isGameOver = true; onGameOver(300); // Win!
+      onGameOver(300); // Win!
       return;
     }
 
     if (newBoard.every(sq => sq !== null)) {
-      isGameOver = true; onGameOver(100); // Draw
+      onGameOver(100); // Draw
       return;
     }
 
@@ -2206,12 +2206,12 @@ export const ClassicTicTacToe: React.FC<GameProps> = ({ onGameOver }) => {
 
         const winner = checkWinner(newBoard);
         if (winner === "O") {
-          isGameOver = true; onGameOver(50); // Loss
+          onGameOver(50); // Loss
           return;
         }
 
         if (newBoard.every(sq => sq !== null)) {
-          isGameOver = true; onGameOver(100); // Draw
+          onGameOver(100); // Draw
           return;
         }
 
@@ -2380,7 +2380,7 @@ export const Classic2048: React.FC<GameProps> = ({ onGameOver }) => {
         const nextGrid = addRandomTile(rotated);
         setGrid(nextGrid);
         if (checkGameOver(nextGrid)) {
-          isGameOver = true; onGameOver(score);
+          onGameOver(score);
         }
       }
     }
