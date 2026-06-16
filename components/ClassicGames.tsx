@@ -37,6 +37,7 @@ export const ClassicSnake: React.FC<GameProps> = ({ onGameOver }) => {
     let score = 0;
     let lastTime = 0;
     const speed = 100; // ms per update
+    const inputQueue: {dx: number, dy: number}[] = [];
 
     const spawnFood = () => {
       food.x = Math.floor(Math.random() * (w / grid)) * grid;
@@ -49,39 +50,53 @@ export const ClassicSnake: React.FC<GameProps> = ({ onGameOver }) => {
       }
       
       const key = e.key.toLowerCase();
-      if ((key === "arrowleft" || key === "a") && dx === 0) {
-        dx = -grid; dy = 0;
-      } else if ((key === "arrowright" || key === "d") && dx === 0) {
-        dx = grid; dy = 0;
-      } else if ((key === "arrowup" || key === "w") && dy === 0) {
-        dx = 0; dy = -grid;
-      } else if ((key === "arrowdown" || key === "s") && dy === 0) {
-        dx = 0; dy = grid;
+      const lastInput = inputQueue.length > 0 ? inputQueue[inputQueue.length - 1] : { dx, dy };
+
+      if ((key === "arrowleft" || key === "a") && lastInput.dx === 0) {
+        inputQueue.push({ dx: -grid, dy: 0 });
+      } else if ((key === "arrowright" || key === "d") && lastInput.dx === 0) {
+        inputQueue.push({ dx: grid, dy: 0 });
+      } else if ((key === "arrowup" || key === "w") && lastInput.dy === 0) {
+        inputQueue.push({ dx: 0, dy: -grid });
+      } else if ((key === "arrowdown" || key === "s") && lastInput.dy === 0) {
+        inputQueue.push({ dx: 0, dy: grid });
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
+
+    const triggerGameOver = () => {
+      isGameOver = true;
+      cancelAnimationFrame(animId);
+      ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+      ctx.fillRect(0, 0, w, h);
+      setTimeout(() => onGameOver(score), 1500);
+    };
 
     const update = (time: number) => {
       if (!isGameOver) animId = requestAnimationFrame(update);
       if (time - lastTime < speed) return;
       lastTime = time;
 
+      if (inputQueue.length > 0) {
+        const nextInput = inputQueue.shift()!;
+        dx = nextInput.dx;
+        dy = nextInput.dy;
+      }
+
       // Move head
       const head = { x: snake[0].x + dx, y: snake[0].y + dy };
 
       // Wall collision
       if (head.x < 0 || head.x >= w || head.y < 0 || head.y >= h) {
-        cancelAnimationFrame(animId);
-        isGameOver = true; onGameOver(score);
+        triggerGameOver();
         return;
       }
 
       // Self collision
       for (let i = 0; i < snake.length; i++) {
         if (snake[i].x === head.x && snake[i].y === head.y) {
-          cancelAnimationFrame(animId);
-          isGameOver = true; onGameOver(score);
+          triggerGameOver();
           return;
         }
       }
@@ -204,18 +219,28 @@ export const ClassicPong: React.FC<GameProps> = ({ onGameOver }) => {
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
 
+    let aiErrorOffset = 0;
+
+    const triggerGameOver = (finalScore: number) => {
+      isGameOver = true;
+      cancelAnimationFrame(animId);
+      ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+      ctx.fillRect(0, 0, w, h);
+      setTimeout(() => onGameOver(finalScore), 1500);
+    };
+
     const update = () => {
       // P1 input (W/S)
       if (keysPressed["w"]) p1y = Math.max(0, p1y - paddleSpeed);
       if (keysPressed["s"]) p1y = Math.min(h - padH, p1y + paddleSpeed);
 
       // P2 input (Arrows or AI)
-      // AI simple tracking
-      const aiTarget = by - padH / 2;
+      // AI tracking with error margin
+      const aiTarget = by - padH / 2 + aiErrorOffset;
       if (p2y < aiTarget - 4) {
-        p2y = Math.min(h - padH, p2y + paddleSpeed * 0.75);
+        p2y = Math.min(h - padH, p2y + paddleSpeed * 0.70);
       } else if (p2y > aiTarget + 4) {
-        p2y = Math.max(0, p2y - paddleSpeed * 0.75);
+        p2y = Math.max(0, p2y - paddleSpeed * 0.70);
       }
 
       // Ball move
@@ -255,18 +280,18 @@ export const ClassicPong: React.FC<GameProps> = ({ onGameOver }) => {
       if (bx - brad < 0) {
         p2score++;
         if (p2score >= 11) {
-          cancelAnimationFrame(animId);
-          isGameOver = true; onGameOver(p1score * 100);
+          triggerGameOver(p1score * 100);
           return;
         }
+        aiErrorOffset = (Math.random() - 0.5) * 40;
         resetBall(1);
       } else if (bx + brad > w) {
         p1score++;
         if (p1score >= 11) {
-          cancelAnimationFrame(animId);
-          isGameOver = true; onGameOver(p1score * 100 + 500); // Victory bonus
+          triggerGameOver(p1score * 100 + 500); // Victory bonus
           return;
         }
+        aiErrorOffset = (Math.random() - 0.5) * 40;
         resetBall(-1);
       }
 
@@ -387,6 +412,14 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
     let curY = 0;
     let curType = 0;
 
+    const triggerGameOver = () => {
+      isGameOver = true;
+      cancelAnimationFrame(animId);
+      ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+      ctx.fillRect(0, 0, w, h);
+      setTimeout(() => onGameOver(score), 1500);
+    };
+
     const spawnPiece = () => {
       curType = Math.floor(Math.random() * 7) + 1;
       curMatrix = SHAPES[curType];
@@ -395,8 +428,7 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
 
       // Check collision on spawn
       if (checkCollision(curMatrix, curX, curY)) {
-        cancelAnimationFrame(animId);
-        isGameOver = true; onGameOver(score);
+        triggerGameOver();
       }
     };
 
@@ -559,6 +591,36 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
         }
       }
 
+      // Calculate ghost piece Y
+      let ghostY = curY;
+      while (!checkCollision(curMatrix, curX, ghostY + 1)) {
+        ghostY++;
+      }
+
+      // Draw ghost piece
+      for (let r = 0; r < curMatrix.length; r++) {
+        for (let c = 0; c < curMatrix[r].length; c++) {
+          if (curMatrix[r][c] !== 0) {
+            ctx.save();
+            ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+            ctx.fillRect(
+              gridOffsetX + (curX + c) * block + 1,
+              gridOffsetY + (ghostY + r) * block + 1,
+              block - 2,
+              block - 2
+            );
+            ctx.strokeRect(
+              gridOffsetX + (curX + c) * block + 1,
+              gridOffsetY + (ghostY + r) * block + 1,
+              block - 2,
+              block - 2
+            );
+            ctx.restore();
+          }
+        }
+      }
+
       // Draw current falling piece
       for (let r = 0; r < curMatrix.length; r++) {
         for (let c = 0; c < curMatrix[r].length; c++) {
@@ -610,8 +672,8 @@ export const ClassicFlappyBird: React.FC<GameProps> = ({ onGameOver }) => {
     // Bird state
     let by = h / 2;
     let bvy = 0;
-    const gravity = 0.35;
-    const flapPower = -6.5;
+    const gravity = 0.25;
+    const flapPower = -5.5;
     const brad = 14;
 
     // Pipes state
@@ -627,6 +689,14 @@ export const ClassicFlappyBird: React.FC<GameProps> = ({ onGameOver }) => {
     let pipeSpeed = 3.0;
     let score = 0;
     let spawnTimer = 0;
+
+    const triggerGameOver = () => {
+      isGameOver = true;
+      cancelAnimationFrame(animId);
+      ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+      ctx.fillRect(0, 0, w, h);
+      setTimeout(() => onGameOver(score), 1500);
+    };
 
     const spawnPipe = () => {
       const minH = 60;
@@ -660,8 +730,7 @@ export const ClassicFlappyBird: React.FC<GameProps> = ({ onGameOver }) => {
 
       // Wall collision (floor/ceiling)
       if (by + brad >= h || by - brad <= 0) {
-        cancelAnimationFrame(animId);
-        isGameOver = true; onGameOver(score);
+        triggerGameOver();
         return;
       }
 
@@ -673,8 +742,7 @@ export const ClassicFlappyBird: React.FC<GameProps> = ({ onGameOver }) => {
         const birdX = w / 4;
         if (birdX + brad > pipe.x && birdX - brad < pipe.x + pipeW) {
           if (by - brad < pipe.topH || by + brad > h - pipe.bottomH) {
-            cancelAnimationFrame(animId);
-            isGameOver = true; onGameOver(score);
+            triggerGameOver();
           }
         }
 
@@ -852,6 +920,14 @@ export const ClassicBreakout: React.FC<GameProps> = ({ onGameOver }) => {
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
 
+    const triggerGameOver = (finalScore: number) => {
+      isGameOver = true;
+      cancelAnimationFrame(animId);
+      ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+      ctx.fillRect(0, 0, w, h);
+      setTimeout(() => onGameOver(finalScore), 1500);
+    };
+
     const update = () => {
       // Paddle input
       if (keysPressed["ArrowLeft"]) padX = Math.max(0, padX - padSpeed);
@@ -874,8 +950,7 @@ export const ClassicBreakout: React.FC<GameProps> = ({ onGameOver }) => {
       if (by + brad >= h) {
         lives--;
         if (lives <= 0) {
-          cancelAnimationFrame(animId);
-          isGameOver = true; onGameOver(score);
+          triggerGameOver(score);
           return;
         } else {
           // Reset ball
@@ -916,8 +991,7 @@ export const ClassicBreakout: React.FC<GameProps> = ({ onGameOver }) => {
 
       if (activeBricks === 0) {
         // Victory!
-        cancelAnimationFrame(animId);
-        isGameOver = true; onGameOver(score + 1000); // 1000 victory bonus points
+        triggerGameOver(score + 1000); // 1000 victory bonus points
         return;
       }
 
@@ -1075,6 +1149,14 @@ export const ClassicAsteroids: React.FC<GameProps> = ({ onGameOver }) => {
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
 
+    const triggerGameOver = (finalScore: number) => {
+      isGameOver = true;
+      cancelAnimationFrame(animId);
+      ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+      ctx.fillRect(0, 0, w, h);
+      setTimeout(() => onGameOver(finalScore), 1500);
+    };
+
     const update = () => {
       // Rotate ship
       if (keysPressed["ArrowLeft"]) sAngle -= 0.07;
@@ -1153,8 +1235,7 @@ export const ClassicAsteroids: React.FC<GameProps> = ({ onGameOver }) => {
         if (dist < a.r + shipR) {
           lives--;
           if (lives <= 0) {
-            cancelAnimationFrame(animId);
-            isGameOver = true; onGameOver(score);
+            triggerGameOver(score);
             return;
           }
           // Reset ship to middle
@@ -1360,6 +1441,14 @@ export const ClassicSpaceInvaders: React.FC<GameProps> = ({ onGameOver }) => {
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
 
+    const triggerGameOver = (finalScore: number) => {
+      isGameOver = true;
+      cancelAnimationFrame(animId);
+      ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+      ctx.fillRect(0, 0, w, h);
+      setTimeout(() => onGameOver(finalScore), 1500);
+    };
+
     const update = (time: number) => {
       // Player movement
       if (keysPressed["ArrowLeft"]) px = Math.max(20, px - pSpeed);
@@ -1390,8 +1479,7 @@ export const ClassicSpaceInvaders: React.FC<GameProps> = ({ onGameOver }) => {
             a.y += 24;
             // check landing game over
             if (a.y + alienH >= h - 60) {
-              cancelAnimationFrame(animId);
-              isGameOver = true; onGameOver(score);
+              triggerGameOver(score);
             }
           });
         }
@@ -1427,8 +1515,7 @@ export const ClassicSpaceInvaders: React.FC<GameProps> = ({ onGameOver }) => {
             bullets.splice(bi, 1);
             lives--;
             if (lives <= 0) {
-              cancelAnimationFrame(animId);
-              isGameOver = true; onGameOver(score);
+              triggerGameOver(score);
               return;
             }
           }
