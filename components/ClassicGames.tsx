@@ -2866,7 +2866,7 @@ export const ClassicDino: React.FC<GameProps> = ({ onGameOver }) => {
       // Score
       ctx.fillStyle = "rgba(255,255,255,0.5)";
       ctx.font = "bold 24px monospace";
-      ctx.fillText(\`SCORE: \${score}\`, 20, 40);
+      ctx.fillText(`SCORE: ${score}`, 20, 40);
 
       // Dino
       ctx.fillStyle = "#3b82f6";
@@ -2952,7 +2952,7 @@ export const ClassicBalance: React.FC<GameProps> = ({ onGameOver }) => {
 
       ctx.fillStyle = "rgba(255,255,255,0.5)";
       ctx.font = "bold 24px monospace";
-      ctx.fillText(\`SCORE: \${score}\`, 20, 40);
+      ctx.fillText(`SCORE: ${score}`, 20, 40);
 
       // Draw Fulcrum
       ctx.fillStyle = "#52525b";
