@@ -1,0 +1,20 @@
+// Re-exports for backward compatibility
+export { ClassicSnake } from "./Snake";
+export { ClassicPong } from "./Pong";
+export { ClassicTetris } from "./Tetris";
+export { ClassicFlappyBird } from "./FlappyBird";
+export { ClassicBreakout } from "./Breakout";
+export { ClassicAsteroids } from "./Asteroids";
+export { ClassicSpaceInvaders } from "./SpaceInvaders";
+export { ClassicPacman } from "./Pacman";
+export { ClassicMemoryMatch } from "./MemoryMatch";
+export { ClassicConnectFour } from "./ConnectFour";
+export { ClassicTicTacToe } from "./TicTacToe";
+export { Classic2048 } from "./Game2048";
+export { ClassicHangman } from "./Hangman";
+export { ClassicRockPaperScissors } from "./RockPaperScissors";
+export { ClassicTypingTest } from "./TypingTest";
+export { ClassicDino } from "./Dino";
+export { ClassicBalance } from "./Balance";
+export { ClassicMaze } from "./Maze";
+export type { GameProps } from "./types";

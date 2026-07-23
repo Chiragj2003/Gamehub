@@ -424,6 +424,27 @@ export const FALLBACK_GAMES: Game[] = [
     rulesJson: ["Counteract the tilting force.", "If the platform leans more than 60 degrees, you lose."],
     createdAt: new Date(),
     updatedAt: new Date(),
+  },
+  {
+    id: 21,
+    title: "Maze",
+    slug: "maze",
+    description: "Navigate through a perfect maze from start to exit. Features 5 difficulty levels, 3 play modes, hints, undo/redo, and keyboard + mouse controls.",
+    category: "Puzzle",
+    difficulty: "Medium",
+    rating: 4.7,
+    plays: 9200,
+    thumbnailUrl: "",
+    iframeUrl: "/games/maze/embed",
+    controlsJson: { move: "Arrow Keys / Click", undo: "Backspace / Ctrl+Z", redo: "Ctrl+Y", hint: "H key" },
+    rulesJson: [
+      "Navigate from the green start to the red exit.",
+      "Move up, down, left, or right — no diagonal movement.",
+      "Every maze has exactly one solution path.",
+      "Use hints wisely — you only get 3 per game."
+    ],
+    createdAt: new Date(),
+    updatedAt: new Date(),
   }
 ];
 
