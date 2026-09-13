@@ -1,190 +1,245 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { RefreshIcon } from "@hugeicons/core-free-icons";
+
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { GameProps } from "./types";
+import { useGameInput, useLatest, type GameAction } from "@/lib/game-engine";
+
+const SIZE = 4;
+const BEST_KEY = "game_hub_2048_best";
+
+type Grid = number[][];
+
+function emptyGrid(): Grid {
+  return Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+}
+
+function addRandomTile(g: Grid): Grid {
+  const empty: Array<[number, number]> = [];
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (g[r][c] === 0) empty.push([r, c]);
+    }
+  }
+  if (empty.length === 0) return g;
+  const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+  const next = g.map((row) => [...row]);
+  next[r][c] = Math.random() < 0.9 ? 2 : 4;
+  return next;
+}
+
+function rotate(g: Grid): Grid {
+  const out = emptyGrid();
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      out[c][SIZE - 1 - r] = g[r][c];
+    }
+  }
+  return out;
+}
+
+/** Slide every row left, merging equal neighbours once. Returns the gain. */
+function slideLeft(g: Grid): { grid: Grid; gained: number } {
+  let gained = 0;
+  const grid = g.map((row) => {
+    const tiles = row.filter((v) => v !== 0);
+    for (let i = 0; i < tiles.length - 1; i++) {
+      if (tiles[i] === tiles[i + 1]) {
+        tiles[i] *= 2;
+        gained += tiles[i];
+        tiles.splice(i + 1, 1);
+      }
+    }
+    while (tiles.length < SIZE) tiles.push(0);
+    return tiles;
+  });
+  return { grid, gained };
+}
+
+/** Express every direction as "rotate, slide left, rotate back". */
+function move(g: Grid, dir: "left" | "right" | "up" | "down") {
+  const turns = { left: 0, up: 3, right: 2, down: 1 }[dir];
+  let work = g;
+  for (let i = 0; i < turns; i++) work = rotate(work);
+  const { grid, gained } = slideLeft(work);
+  work = grid;
+  for (let i = 0; i < (4 - turns) % 4; i++) work = rotate(work);
+  return { grid: work, gained };
+}
+
+function hasMoves(g: Grid): boolean {
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (g[r][c] === 0) return true;
+      if (r < SIZE - 1 && g[r][c] === g[r + 1][c]) return true;
+      if (c < SIZE - 1 && g[r][c] === g[r][c + 1]) return true;
+    }
+  }
+  return false;
+}
+
+function same(a: Grid, b: Grid) {
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (a[r][c] !== b[r][c]) return false;
+    }
+  }
+  return true;
+}
+
+function freshGame(): Grid {
+  return addRandomTile(addRandomTile(emptyGrid()));
+}
+
+const TILE_STYLES: Record<number, string> = {
+  2: "bg-zinc-800 text-zinc-300",
+  4: "bg-zinc-700 text-zinc-100",
+  8: "bg-emerald-500/20 text-emerald-300",
+  16: "bg-cyan-500/20 text-cyan-300",
+  32: "bg-violet-500/25 text-violet-300",
+  64: "bg-pink-500/25 text-pink-300",
+  128: "bg-rose-500/30 text-rose-200",
+  256: "bg-amber-400/30 text-amber-200",
+  512: "bg-emerald-400/35 text-emerald-100",
+  1024: "bg-cyan-400/40 text-cyan-50",
+  2048: "bg-violet-400 text-white shadow-[0_0_28px_rgba(167,139,250,0.7)]",
+};
 
 export const Classic2048: React.FC<GameProps> = ({ onGameOver }) => {
-  const [grid, setGrid] = useState<number[][]>(Array(4).fill(0).map(() => Array(4).fill(0)));
+  const [grid, setGrid] = useState<Grid>(() => freshGame());
   const [score, setScore] = useState(0);
+  const [best, setBest] = useState(0);
+  const [won, setWon] = useState(false);
+  const [over, setOver] = useState(false);
+  const onGameOverRef = useLatest(onGameOver);
+  const boardRef = useRef<HTMLDivElement>(null);
 
-  const initGame = () => {
-    let newGrid = Array(4).fill(0).map(() => Array(4).fill(0));
-    newGrid = addRandomTile(newGrid);
-    newGrid = addRandomTile(newGrid);
-    setGrid(newGrid);
-    setScore(0);
-  };
-
-  const addRandomTile = (g: number[][]) => {
-    const emptyCells = [];
-    for (let r = 0; r < 4; r++) {
-      for (let c = 0; c < 4; c++) {
-        if (g[r][c] === 0) emptyCells.push({ r, c });
-      }
-    }
-    if (emptyCells.length === 0) return g;
-    const { r, c } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-    const newG = g.map(row => [...row]);
-    newG[r][c] = Math.random() < 0.9 ? 2 : 4;
-    return newG;
-  };
+  // The score lives in a ref for the move handler so the value reported at
+  // game over includes the final merge; reading React state there gave the
+  // score from one move earlier.
+  const scoreRef = useRef(0);
+  const gridRef = useLatest(grid);
+  const overRef = useLatest(over);
 
   useEffect(() => {
-    initGame();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    try {
+      setBest(Number(localStorage.getItem(BEST_KEY)) || 0);
+    } catch {
+      // Storage unavailable; best score simply resets each visit.
+    }
   }, []);
 
-  const rotateGrid = (g: number[][]) => {
-    const rotated = Array(4).fill(0).map(() => Array(4).fill(0));
-    for (let r = 0; r < 4; r++) {
-      for (let c = 0; c < 4; c++) {
-        rotated[c][3 - r] = g[r][c];
-      }
-    }
-    return rotated;
-  };
+  const applyMove = useCallback(
+    (dir: "left" | "right" | "up" | "down") => {
+      if (overRef.current) return;
+      const current = gridRef.current;
+      const { grid: next, gained } = move(current, dir);
+      if (same(current, next)) return;
 
-  const slideLeft = (g: number[][]) => {
-    let addedScore = 0;
-    const shifted = g.map(row => {
-      // Filter non-zero
-      const filtered = row.filter(val => val !== 0);
-      // Merge
-      for (let i = 0; i < filtered.length - 1; i++) {
-        if (filtered[i] === filtered[i + 1]) {
-          filtered[i] *= 2;
-          addedScore += filtered[i];
-          filtered.splice(i + 1, 1);
+      const spawned = addRandomTile(next);
+      scoreRef.current += gained;
+      const newScore = scoreRef.current;
+      setGrid(spawned);
+      setScore(newScore);
+
+      if (newScore > best) {
+        setBest(newScore);
+        try {
+          localStorage.setItem(BEST_KEY, String(newScore));
+        } catch {
+          // Ignore; storage may be disabled.
         }
       }
-      // Pad zeroes
-      while (filtered.length < 4) {
-        filtered.push(0);
+
+      if (!won && spawned.some((row) => row.includes(2048))) setWon(true);
+
+      if (!hasMoves(spawned)) {
+        setOver(true);
+        setTimeout(() => onGameOverRef.current(newScore), 900);
       }
-      return filtered;
-    });
-    return { shifted, addedScore };
-  };
+    },
+    [best, won, gridRef, overRef, onGameOverRef]
+  );
 
-  const checkGameOver = (g: number[][]) => {
-    for (let r = 0; r < 4; r++) {
-      for (let c = 0; c < 4; c++) {
-        if (g[r][c] === 0) return false;
-        if (r < 3 && g[r][c] === g[r + 1][c]) return false;
-        if (c < 3 && g[r][c] === g[r][c + 1]) return false;
+  useGameInput({
+    target: boardRef,
+    queueDirections: false,
+    enableSwipe: true,
+    onAction: (action: GameAction) => {
+      if (action === "left" || action === "right" || action === "up" || action === "down") {
+        applyMove(action);
       }
-    }
-    return true;
-  };
+    },
+  });
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "s", "a", "d"].includes(e.key.toLowerCase())) {
-      e.preventDefault();
-    }
-    
-    const key = e.key.toLowerCase();
-    let rotated = grid.map(row => [...row]);
-    let moves = 0;
-
-    // We align moves to rotating and shifting left
-    if (key === "arrowleft" || key === "a") {
-      const res = slideLeft(rotated);
-      rotated = res.shifted;
-      setScore(prev => prev + res.addedScore);
-      moves++;
-    } else if (key === "arrowright" || key === "d") {
-      // rotate 2 times, slide, rotate 2 times
-      rotated = rotateGrid(rotateGrid(rotated));
-      const res = slideLeft(rotated);
-      rotated = res.shifted;
-      rotated = rotateGrid(rotateGrid(rotated));
-      setScore(prev => prev + res.addedScore);
-      moves++;
-    } else if (key === "arrowup" || key === "w") {
-      // rotate clockwise 3 times (counter-clockwise 1 time), slide left, rotate 1 time
-      rotated = rotateGrid(rotateGrid(rotateGrid(rotated)));
-      const res = slideLeft(rotated);
-      rotated = res.shifted;
-      rotated = rotateGrid(rotated);
-      setScore(prev => prev + res.addedScore);
-      moves++;
-    } else if (key === "arrowdown" || key === "s") {
-      // rotate 1 time, slide left, rotate 3 times
-      rotated = rotateGrid(rotated);
-      const res = slideLeft(rotated);
-      rotated = res.shifted;
-      rotated = rotateGrid(rotateGrid(rotateGrid(rotated)));
-      setScore(prev => prev + res.addedScore);
-      moves++;
-    }
-
-    if (moves > 0) {
-      // Only spawn tile if grid state actually changed
-      const stateChanged = JSON.stringify(grid) !== JSON.stringify(rotated);
-      if (stateChanged) {
-        const nextGrid = addRandomTile(rotated);
-        setGrid(nextGrid);
-        if (checkGameOver(nextGrid)) {
-          onGameOver(score);
-        }
-      }
-    }
-  };
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grid, score]);
-
-  const getTileColors = (val: number) => {
-    const colors: Record<number, string> = {
-      2: "bg-zinc-800 text-zinc-300 border-white/5",
-      4: "bg-zinc-700 text-zinc-200 border-white/10",
-      8: "bg-neon-green/10 text-neon-green border-neon-green/20 shadow-[0_0_10px_rgba(34,197,94,0.1)]",
-      16: "bg-neon-cyan/10 text-neon-cyan border-neon-cyan/20 shadow-[0_0_10px_rgba(6,182,212,0.1)]",
-      32: "bg-neon-violet/10 text-neon-violet border-neon-violet/20 shadow-[0_0_10px_rgba(139,92,246,0.1)]",
-      64: "bg-pink-500/10 text-pink-400 border-pink-500/20 shadow-[0_0_10px_rgba(236,72,153,0.1)]",
-      128: "bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_10px_rgba(244,63,94,0.15)]",
-      256: "bg-amber-400/10 text-amber-300 border-amber-400/20 shadow-[0_0_12px_rgba(250,204,21,0.2)]",
-      512: "bg-emerald-500/10 text-emerald-300 border-emerald-500/25 shadow-[0_0_15px_rgba(16,185,129,0.25)]",
-      1024: "bg-cyan-500/10 text-cyan-300 border-cyan-500/25 shadow-[0_0_18px_rgba(6,182,212,0.3)]",
-      2048: "bg-primary/10 text-primary border-primary/30 shadow-[0_0_24px_rgba(139,92,246,0.45)]",
-    };
-    return colors[val] || "bg-zinc-950 text-white border-white/5";
+  const restart = () => {
+    scoreRef.current = 0;
+    setGrid(freshGame());
+    setScore(0);
+    setWon(false);
+    setOver(false);
   };
 
   return (
-    <div className="w-full h-full bg-zinc-950 flex flex-col items-center justify-center p-6 font-sans">
-      <div className="flex items-center justify-between w-full max-w-xs mb-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">
-        <div>Score: <span className="font-mono text-neon-cyan text-glow-cyan text-base">{score}</span></div>
+    <div className="flex h-full w-full flex-col items-center justify-center bg-zinc-950 p-6 font-sans select-none">
+      <div className="mb-5 flex w-full max-w-xs items-end justify-between">
+        <div className="flex gap-4">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Score</div>
+            <div className="font-mono text-2xl font-black text-cyan-300">{score}</div>
+          </div>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Best</div>
+            <div className="font-mono text-2xl font-black text-zinc-300">{best}</div>
+          </div>
+        </div>
         <button
-          onClick={initGame}
-          className="h-7 w-7 flex items-center justify-center border border-white/5 bg-zinc-900/40 rounded-full hover:bg-white/5 transition-all text-white cursor-pointer"
+          onClick={restart}
+          className="h-8 cursor-pointer rounded-full border border-white/10 bg-zinc-900 px-3 text-[11px] font-bold uppercase tracking-wider text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
         >
-          <HugeiconsIcon icon={RefreshIcon} className="h-3.5 w-3.5" />
+          New game
         </button>
       </div>
 
-      <div className="bg-zinc-900/40 border border-white/5 p-3.5 rounded-2xl grid grid-cols-4 gap-3 w-full max-w-xs aspect-square">
+      <div
+        ref={boardRef}
+        className="relative grid w-full max-w-xs aspect-square grid-cols-4 gap-3 rounded-2xl border border-white/5 bg-zinc-900/60 p-3.5 touch-none"
+        role="grid"
+        aria-label="2048 board"
+      >
         {grid.map((row, r) =>
           row.map((val, c) => {
-            const tileStyle = getTileColors(val);
-            const valStr = val === 0 ? "" : val.toString();
-            const textSz = val >= 1024 ? "text-lg" : val >= 128 ? "text-xl" : "text-2xl";
-
+            const style = val === 0 ? "bg-zinc-950/60" : TILE_STYLES[val] ?? "bg-white text-black";
+            const size = val >= 1024 ? "text-lg" : val >= 128 ? "text-xl" : "text-2xl";
             return (
               <div
                 key={`${r}-${c}`}
-                className={`rounded-xl border flex items-center justify-center font-black ${textSz} transition-all duration-300 ${tileStyle}`}
+                role="gridcell"
+                className={`flex items-center justify-center rounded-xl font-black transition-all duration-150 ${size} ${style}`}
               >
-                {valStr}
+                {val === 0 ? "" : val}
               </div>
             );
           })
         )}
+
+        {(won || over) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-zinc-950/85 backdrop-blur-sm">
+            <div className="text-3xl font-black uppercase tracking-tight text-white">
+              {over ? "No moves left" : "You made 2048!"}
+            </div>
+            {won && !over && (
+              <button
+                onClick={() => setWon(false)}
+                className="cursor-pointer rounded-full bg-white px-5 py-2 text-xs font-bold uppercase tracking-wider text-black transition-opacity hover:opacity-90"
+              >
+                Keep going
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      <p className="mt-4 text-[11px] font-medium text-zinc-500">Arrow keys, WASD, or swipe</p>
     </div>
   );
 };

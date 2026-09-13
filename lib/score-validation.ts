@@ -7,45 +7,10 @@
  * a script — but it removes the trivial `curl` attack and bounds the damage.
  */
 
-/** Per-game ceilings, set well above realistic human play but far below Number.MAX. */
-const SCORE_CEILINGS: Record<string, number> = {
-  snake: 5_000,
-  pong: 1_600,
-  tetris: 500_000,
-  "flappy-bird": 1_000,
-  breakout: 20_000,
-  asteroids: 100_000,
-  "space-invaders": 50_000,
-  pacman: 100_000,
-  "memory-match": 10_000,
-  "connect-four": 5_000,
-  "tic-tac-toe": 1_000,
-  "2048": 200_000,
-  hangman: 5_000,
-  "rock-paper-scissors": 2_000,
-  dino: 50_000,
-  "typing-test": 300,
-  balance: 50_000,
-  maze: 50_000,
-  "neon-snake": 50_000,
-  "space-defender": 200_000,
-  "memory-matrix": 100_000,
-};
+import { getCatalogGame } from "./catalog";
 
+/** Used when a submission names a slug the catalog does not know. */
 const DEFAULT_CEILING = 100_000;
-
-/**
- * Highest plausible points per second of play, per game.
- * A 400-point Snake run cannot happen in four seconds; this catches scores that
- * are individually under the ceiling but impossible for the time elapsed.
- */
-const MAX_RATE: Record<string, number> = {
-  snake: 12,
-  tetris: 900,
-  "2048": 600,
-  "typing-test": 4,
-};
-
 const DEFAULT_MAX_RATE = 2_000;
 
 export interface ScoreSubmission {
@@ -76,15 +41,16 @@ export function validateScore(input: ScoreSubmission): ValidationResult {
     return { ok: false, reason: "Score must be a non-negative integer" };
   }
 
-  const ceiling = slug ? (SCORE_CEILINGS[slug] ?? DEFAULT_CEILING) : DEFAULT_CEILING;
+  const game = slug ? getCatalogGame(slug) : undefined;
+  const ceiling = game?.maxScore ?? DEFAULT_CEILING;
   if (score > ceiling) {
     return { ok: false, reason: "Score exceeds the maximum possible for this game" };
   }
 
   // Reject scores that outpace what the elapsed play time allows. A 2s grace
-  // period keeps legitimate fast finishes (Tic Tac Toe, RPS) from tripping it.
+  // period keeps legitimate fast finishes (a quick Pong loss, an early Flappy death) from tripping it.
   if (typeof durationSeconds === "number" && durationSeconds >= 0) {
-    const rate = slug ? (MAX_RATE[slug] ?? DEFAULT_MAX_RATE) : DEFAULT_MAX_RATE;
+    const rate = game?.maxRate ?? DEFAULT_MAX_RATE;
     if (score > rate * (durationSeconds + 2)) {
       return { ok: false, reason: "Score is not achievable in the time played" };
     }

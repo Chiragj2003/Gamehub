@@ -1,132 +1,240 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { GameProps } from "./types";
+import {
+  useGameLoop,
+  useGameInput,
+  useGameCanvas,
+  useLatest,
+  drawPauseOverlay,
+  drawGameOverFlash,
+} from "@/lib/game-engine";
+
+const WIDTH = 800;
+const HEIGHT = 400;
+const GROUND_Y = HEIGHT - 40;
+
+const DINO_X = 100;
+const DINO_W = 40;
+const DINO_H = 44;
+const DUCK_H = 24;
+
+const GRAVITY = 2400;
+const JUMP = -760;
+/** Holding jump after the apex lets the fall come sooner, for short hops. */
+const FAST_FALL = 2.2;
+
+const START_SPEED = 330;
+const MAX_SPEED = 720;
+/** Speed gained per second of survival. */
+const ACCEL = 9;
+
+/** Spawn gap shrinks as speed rises so the screen density stays constant. */
+const SPAWN_MIN = 0.9;
+const SPAWN_MAX = 1.8;
+
+type Obstacle = {
+  x: number;
+  w: number;
+  h: number;
+  /** Height above the ground; 0 for cacti, raised for birds. */
+  lift: number;
+  passed: boolean;
+};
+
+function initialState() {
+  return {
+    y: GROUND_Y,
+    vy: 0,
+    grounded: true,
+    ducking: false,
+    obstacles: [] as Obstacle[],
+    speed: START_SPEED,
+    spawnTimer: 1.2,
+    distance: 0,
+    score: 0,
+    started: false,
+    paused: false,
+    over: false,
+    reported: false,
+    legPhase: 0,
+  };
+}
 
 export const ClassicDino: React.FC<GameProps> = ({ onGameOver }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { canvasRef, ctxRef } = useGameCanvas(WIDTH, HEIGHT);
+  const onGameOverRef = useLatest(onGameOver);
+  const stateRef = useRef(initialState());
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  const jump = () => {
+    const s = stateRef.current;
+    if (s.over || s.paused) return;
+    s.started = true;
+    if (s.grounded && !s.ducking) {
+      s.vy = JUMP;
+      s.grounded = false;
+    }
+  };
 
-    let animId: number;
-    let isGameOver = false;
-    const w = canvas.width;
-    const h = canvas.height;
+  const input = useGameInput({
+    target: canvasRef,
+    queueDirections: false,
+    enableSwipe: true,
+    onTap: jump,
+    onPause: () => {
+      const s = stateRef.current;
+      if (!s.over && s.started) s.paused = !s.paused;
+    },
+  });
 
-    // Dino
-    let dy = h - 60;
-    let dvy = 0;
-    const gravity = 0.6;
-    const jumpPower = -12;
-    let isJumping = false;
-    
-    // Cactus
-    interface Cactus { x: number; w: number; h: number; passed: boolean }
-    let cacti: Cactus[] = [];
-    let speed = 6;
-    let score = 0;
-    let spawnTimer = 0;
+  useGameLoop({
+    step: 1000 / 120,
+    update: (dt) => {
+      const s = stateRef.current;
+      const io = input.current;
+      if (!io || s.over || s.paused) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ([" ", "ArrowUp"].includes(e.key)) {
-        e.preventDefault();
-        if (!isJumping && !isGameOver) {
-          dvy = jumpPower;
-          isJumping = true;
+      if (io.consumePress("primary") || io.consumePress("up")) jump();
+      // Swipe down on touch also ducks; the swipe registers as a "down" press.
+      s.ducking = s.grounded && (io.isDown("down") || io.consumePress("down"));
+      if (!s.started) return;
+
+      const holdingJump = io.isDown("primary") || io.isDown("up");
+      const g = !holdingJump && s.vy < 0 ? GRAVITY * FAST_FALL : GRAVITY;
+      s.vy += g * dt;
+      s.y += s.vy * dt;
+      if (s.y >= GROUND_Y) {
+        s.y = GROUND_Y;
+        s.vy = 0;
+        s.grounded = true;
+      }
+
+      s.speed = Math.min(MAX_SPEED, s.speed + ACCEL * dt);
+      s.distance += s.speed * dt;
+      // Score like the original: one point per ~10px travelled.
+      s.score = Math.floor(s.distance / 10);
+      s.legPhase += dt * 12;
+
+      s.spawnTimer -= dt;
+      if (s.spawnTimer <= 0) {
+        const speedRatio = (s.speed - START_SPEED) / (MAX_SPEED - START_SPEED);
+        s.spawnTimer = SPAWN_MAX - (SPAWN_MAX - SPAWN_MIN) * speedRatio + Math.random() * 0.6;
+
+        // Birds appear only once the player has warmed up.
+        const isBird = s.score > 200 && Math.random() < 0.28;
+        if (isBird) {
+          // Low birds must be jumped; high birds must be ducked under.
+          const lift = Math.random() < 0.5 ? 18 : DUCK_H + 16;
+          s.obstacles.push({ x: WIDTH + 40, w: 40, h: 22, lift, passed: false });
+        } else {
+          const count = 1 + (Math.random() < 0.3 ? 1 : 0) + (s.score > 400 && Math.random() < 0.25 ? 1 : 0);
+          const w = 18 * count + (count - 1) * 6;
+          const h = 38 + Math.random() * 28;
+          s.obstacles.push({ x: WIDTH + 40, w, h, lift: 0, passed: false });
         }
       }
-    };
-    window.addEventListener("keydown", handleKeyDown);
 
-    const update = () => {
-      // Physics
-      dvy += gravity;
-      dy += dvy;
-      if (dy >= h - 60) {
-        dy = h - 60;
-        dvy = 0;
-        isJumping = false;
-      }
+      const dinoH = s.ducking ? DUCK_H : DINO_H;
+      const dinoTop = s.y - dinoH;
+      // Slightly inset hitbox so near misses feel fair, as in the original.
+      const hx = DINO_X + 6;
+      const hw = DINO_W - 12;
 
-      // Cacti
-      spawnTimer++;
-      if (spawnTimer > 100 - speed * 2) {
-        spawnTimer = 0;
-        cacti.push({
-          x: w,
-          w: 20 + Math.random() * 20,
-          h: 40 + Math.random() * 40,
-          passed: false
-        });
-      }
-
-      for (let i = 0; i < cacti.length; i++) {
-        const c = cacti[i];
-        c.x -= speed;
-
-        // Collision
-        if (
-          100 < c.x + c.w &&
-          140 > c.x &&
-          dy < h - 60 + c.h &&
-          dy + 40 > h - c.h
-        ) {
-          isGameOver = true;
-          cancelAnimationFrame(animId);
-          ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
-          ctx.fillRect(0, 0, w, h);
-          setTimeout(() => onGameOver(score), 1500);
-          return;
-        }
-
-        if (!c.passed && c.x < 100) {
-          c.passed = true;
-          score += 10;
-          if (score % 100 === 0) speed += 0.5;
+      for (const o of s.obstacles) {
+        o.x -= s.speed * dt;
+        const oTop = GROUND_Y - o.lift - o.h;
+        const oBottom = GROUND_Y - o.lift;
+        if (hx < o.x + o.w && hx + hw > o.x && dinoTop < oBottom && s.y > oTop) {
+          s.over = true;
+          break;
         }
       }
-      cacti = cacti.filter(c => c.x + c.w > 0);
+      s.obstacles = s.obstacles.filter((o) => o.x + o.w > -10);
 
-      // Draw
+      if (s.over && !s.reported) {
+        s.reported = true;
+        const final = s.score;
+        setTimeout(() => onGameOverRef.current(final), 1200);
+      }
+    },
+
+    render: () => {
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+      const s = stateRef.current;
+
       ctx.fillStyle = "#09090b";
-      ctx.fillRect(0, 0, w, h);
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      // Ground
-      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.strokeStyle = "rgba(255,255,255,0.25)";
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(0, h - 20);
-      ctx.lineTo(w, h - 20);
+      ctx.moveTo(0, GROUND_Y + 1);
+      ctx.lineTo(WIDTH, GROUND_Y + 1);
       ctx.stroke();
 
-      // Score
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.font = "bold 24px monospace";
-      ctx.fillText(`SCORE: ${score}`, 20, 40);
+      // Ground texture scrolls with the run so speed is visible.
+      ctx.fillStyle = "rgba(255,255,255,0.08)";
+      const scroll = (s.distance * 1) % 80;
+      for (let x = -scroll; x < WIDTH; x += 80) {
+        ctx.fillRect(x, GROUND_Y + 10, 26, 2);
+        ctx.fillRect(x + 44, GROUND_Y + 16, 12, 2);
+      }
 
-      // Dino
-      ctx.fillStyle = "#3b82f6";
-      ctx.fillRect(100, dy - 40, 40, 40);
-
-      // Cacti
       ctx.fillStyle = "#10b981";
-      cacti.forEach(c => {
-        ctx.fillRect(c.x, h - 20 - c.h, c.w, c.h);
-      });
+      for (const o of s.obstacles) {
+        const top = GROUND_Y - o.lift - o.h;
+        if (o.lift > 0) {
+          // Bird: body plus a flapping wing.
+          ctx.fillRect(o.x, top + 6, o.w, o.h - 12);
+          const wingUp = Math.floor(s.legPhase) % 2 === 0;
+          ctx.fillRect(o.x + o.w / 2 - 4, wingUp ? top : top + o.h - 6, 8, 6);
+        } else {
+          ctx.fillRect(o.x, top, o.w, o.h);
+          // Cactus arms.
+          ctx.fillRect(o.x - 6, top + 10, 6, 14);
+          ctx.fillRect(o.x + o.w, top + 16, 6, 12);
+        }
+      }
 
-      if (!isGameOver) animId = requestAnimationFrame(update);
-    };
+      const dinoH = s.ducking ? DUCK_H : DINO_H;
+      const dinoW = s.ducking ? DINO_W + 14 : DINO_W;
+      ctx.fillStyle = "#3b82f6";
+      ctx.fillRect(DINO_X, s.y - dinoH, dinoW, dinoH);
+      // Eye
+      ctx.fillStyle = "#09090b";
+      ctx.fillRect(DINO_X + dinoW - 12, s.y - dinoH + 8, 5, 5);
+      // Legs alternate while running on the ground.
+      if (s.grounded && s.started) {
+        const step = Math.floor(s.legPhase) % 2 === 0;
+        ctx.fillStyle = "#09090b";
+        ctx.fillRect(DINO_X + (step ? 6 : 22), s.y - 8, 8, 8);
+      }
 
-    if (!isGameOver) animId = requestAnimationFrame(update);
+      ctx.textAlign = "right";
+      ctx.font = "bold 22px monospace";
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.fillText(String(s.score).padStart(5, "0"), WIDTH - 24, 40);
 
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      cancelAnimationFrame(animId);
-    };
-  }, [onGameOver]);
+      if (!s.started) {
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.font = "bold 20px system-ui, sans-serif";
+        ctx.fillText("Space / tap to jump  ·  Down / swipe down to duck", WIDTH / 2, HEIGHT / 2 - 40);
+      }
 
-  return <canvas ref={canvasRef} width={800} height={400} className="w-full max-w-3xl aspect-[2/1] block bg-zinc-950 rounded-xl" />;
+      if (s.paused) drawPauseOverlay(ctx, WIDTH, HEIGHT);
+      if (s.over) drawGameOverFlash(ctx, WIDTH, HEIGHT);
+    },
+  });
+
+  return (
+    <canvas
+      ref={canvasRef}
+      onMouseDown={jump}
+      className="block h-full w-full cursor-pointer touch-none bg-zinc-950"
+      aria-label="Dino runner game"
+    />
+  );
 };

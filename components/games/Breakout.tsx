@@ -1,212 +1,288 @@
-﻿"use client";
+"use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { GameProps } from "./types";
+import {
+  useGameLoop,
+  useGameInput,
+  useGameCanvas,
+  useLatest,
+  drawPauseOverlay,
+  drawGameOverFlash,
+} from "@/lib/game-engine";
+
+const WIDTH = 800;
+const HEIGHT = 600;
+
+const PAD_W = 110;
+const PAD_H = 14;
+const PAD_Y = HEIGHT - 40;
+const PAD_SPEED = 560;
+
+const BALL_R = 7;
+const BALL_START_SPEED = 340;
+const BALL_SPEED_PER_LEVEL = 40;
+const BALL_MAX_SPEED = 620;
+/** Bounce angle range off the paddle, measured from vertical. */
+const MAX_BOUNCE = Math.PI / 3;
+
+const BRICK_COLS = 10;
+const BRICK_H = 22;
+const BRICK_PAD = 6;
+const BRICK_TOP = 70;
+const BRICK_SIDE = 30;
+const BRICK_W = (WIDTH - BRICK_SIDE * 2 - BRICK_PAD * (BRICK_COLS - 1)) / BRICK_COLS;
+
+const COLORS = ["#f43f5e", "#f97316", "#eab308", "#10b981", "#06b6d4", "#a855f7"];
+
+type Brick = { x: number; y: number; hp: number; color: string };
+
+function buildBricks(level: number): Brick[] {
+  const rows = Math.min(4 + level, 8);
+  const bricks: Brick[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < BRICK_COLS; c++) {
+      // Top rows take two hits from level 2 onward.
+      const hp = level >= 2 && r < 2 ? 2 : 1;
+      bricks.push({
+        x: BRICK_SIDE + c * (BRICK_W + BRICK_PAD),
+        y: BRICK_TOP + r * (BRICK_H + BRICK_PAD),
+        hp,
+        color: COLORS[r % COLORS.length],
+      });
+    }
+  }
+  return bricks;
+}
+
+function initialState() {
+  return {
+    padX: (WIDTH - PAD_W) / 2,
+    bx: WIDTH / 2,
+    by: PAD_Y - BALL_R - 1,
+    bvx: 0,
+    bvy: 0,
+    /** Ball rides the paddle until launched. */
+    stuck: true,
+    bricks: buildBricks(1),
+    level: 1,
+    score: 0,
+    lives: 3,
+    paused: false,
+    over: false,
+    reported: false,
+    /** Brief banner shown between levels. */
+    banner: 0,
+    lastPointerX: -1,
+  };
+}
 
 export const ClassicBreakout: React.FC<GameProps> = ({ onGameOver }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { canvasRef, ctxRef } = useGameCanvas(WIDTH, HEIGHT);
+  const onGameOverRef = useLatest(onGameOver);
+  const stateRef = useRef(initialState());
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  const launch = () => {
+    const s = stateRef.current;
+    if (!s.stuck || s.over || s.paused) return;
+    s.stuck = false;
+    const speed = Math.min(BALL_MAX_SPEED, BALL_START_SPEED + (s.level - 1) * BALL_SPEED_PER_LEVEL);
+    const angle = (Math.random() - 0.5) * 0.6;
+    s.bvx = Math.sin(angle) * speed;
+    s.bvy = -Math.cos(angle) * speed;
+  };
 
-    let animId: number;
-    let isGameOver = false;
-    const w = canvas.width;
-    const h = canvas.height;
+  const input = useGameInput({
+    target: canvasRef,
+    queueDirections: false,
+    enableSwipe: false,
+    onTap: launch,
+    onPause: () => {
+      const s = stateRef.current;
+      if (!s.over) s.paused = !s.paused;
+    },
+  });
 
-    // Paddle
-    const padW = 100;
-    const padH = 14;
-    let padX = (w - padW) / 2;
-    const padSpeed = 7;
+  useGameLoop({
+    step: 1000 / 240, // fine step so a fast ball never skips a brick
+    update: (dt) => {
+      const s = stateRef.current;
+      const io = input.current;
+      if (!io || s.over || s.paused) return;
 
-    // Ball
-    let bx = w / 2;
-    let by = h - 50;
-    let bvx = 4;
-    let bvy = -4;
-    const brad = 7;
-
-    // Bricks
-    const brickRows = 5;
-    const brickCols = 8;
-    const bPadding = 10;
-    const bOffsetTop = 50;
-    const bOffsetLeft = 35;
-    const brickW = (w - bOffsetLeft * 2 - bPadding * (brickCols - 1)) / brickCols;
-    const brickH = 20;
-
-    interface Brick {
-      x: number;
-      y: number;
-      status: number;
-      color: string;
-    }
-    const colors = ["#f43f5e", "#d946ef", "#a855f7", "#3b82f6", "#06b6d4"];
-    const bricks: Brick[][] = [];
-
-    for (let r = 0; r < brickRows; r++) {
-      bricks[r] = [];
-      for (let c = 0; c < brickCols; c++) {
-        bricks[r][c] = {
-          x: c * (brickW + bPadding) + bOffsetLeft,
-          y: r * (brickH + bPadding) + bOffsetTop,
-          status: 1,
-          color: colors[r],
-        };
-      }
-    }
-
-    let score = 0;
-    let lives = 3;
-    const keysPressed: Record<string, boolean> = {};
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) {
-        e.preventDefault();
-      }
-      keysPressed[e.key] = true;
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      keysPressed[e.key] = false;
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-
-    const triggerGameOver = (finalScore: number) => {
-      isGameOver = true;
-      cancelAnimationFrame(animId);
-      ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
-      ctx.fillRect(0, 0, w, h);
-      setTimeout(() => onGameOver(finalScore), 1500);
-    };
-
-    const update = () => {
-      // Paddle input
-      if (keysPressed["ArrowLeft"]) padX = Math.max(0, padX - padSpeed);
-      if (keysPressed["ArrowRight"]) padX = Math.min(w - padW, padX + padSpeed);
-
-      // Ball move
-      bx += bvx;
-      by += bvy;
-
-      // Wall bounces (left/right)
-      if (bx - brad <= 0 || bx + brad >= w) {
-        bvx = -bvx;
-      }
-      // Wall bounces (top)
-      if (by - brad <= 0) {
-        bvy = -bvy;
-      }
-
-      // Ball out bottom
-      if (by + brad >= h) {
-        lives--;
-        if (lives <= 0) {
-          triggerGameOver(score);
-          return;
-        } else {
-          // Reset ball
-          bx = w / 2;
-          by = h - 50;
-          bvx = 4;
-          bvy = -4;
-          padX = (w - padW) / 2;
-        }
-      }
-
-      // Paddle bounce
-      if (by + brad >= h - 25 - padH && by - brad <= h - 25) {
-        if (bx >= padX && bx <= padX + padW) {
-          bvy = -Math.abs(bvy); // deflect up
-          // alter angle depending on hit location
-          const relativePos = (bx - (padX + padW / 2)) / (padW / 2);
-          bvx = relativePos * 6;
-        }
-      }
-
-      // Brick collision
-      let activeBricks = 0;
-      for (let r = 0; r < brickRows; r++) {
-        for (let c = 0; c < brickCols; c++) {
-          const b = bricks[r][c];
-          if (b.status === 1) {
-            activeBricks++;
-            // Check collision
-            if (bx + brad > b.x && bx - brad < b.x + brickW && by + brad > b.y && by - brad < b.y + brickH) {
-              bvy = -bvy;
-              b.status = 0;
-              score += 20;
-            }
-          }
-        }
-      }
-
-      if (activeBricks === 0) {
-        // Victory!
-        triggerGameOver(score + 1000); // 1000 victory bonus points
+      if (s.banner > 0) {
+        s.banner -= dt;
         return;
       }
 
-      // Render
-      ctx.fillStyle = "#09090b";
-      ctx.fillRect(0, 0, w, h);
+      // Paddle: keys take priority; otherwise follow the pointer or finger,
+      // but only while it is actually moving so a resting mouse does not pin
+      // the paddle for a keyboard player.
+      const keyed = io.isDown("left") || io.isDown("right");
+      const p = io.pointer();
+      if (keyed) {
+        if (io.isDown("left")) s.padX -= PAD_SPEED * dt;
+        if (io.isDown("right")) s.padX += PAD_SPEED * dt;
+      } else if (p && p.x !== s.lastPointerX) {
+        s.padX = p.x - PAD_W / 2;
+      }
+      if (p) s.lastPointerX = p.x;
+      s.padX = Math.max(0, Math.min(WIDTH - PAD_W, s.padX));
 
-      // Draw HUD
-      ctx.font = "semibold 12px sans-serif";
-      ctx.fillStyle = "#a1a1aa";
-      ctx.fillText(`SCORE: ${score}`, 25, 25);
-      ctx.fillText(`LIVES: ${"❤".repeat(lives)}`, w - 100, 25);
+      if (io.consumePress("primary") || io.consumePress("up")) launch();
 
-      // Draw bricks
-      for (let r = 0; r < brickRows; r++) {
-        for (let c = 0; c < brickCols; c++) {
-          const b = bricks[r][c];
-          if (b.status === 1) {
-            ctx.save();
-            ctx.shadowColor = b.color;
-            
-            ctx.fillStyle = b.color;
-            ctx.fillRect(b.x, b.y, brickW, brickH);
-            ctx.restore();
-          }
+      if (s.stuck) {
+        s.bx = s.padX + PAD_W / 2;
+        s.by = PAD_Y - BALL_R - 1;
+        return;
+      }
+
+      s.bx += s.bvx * dt;
+      s.by += s.bvy * dt;
+
+      // Walls: reflect and clamp so the ball cannot sink into an edge.
+      if (s.bx - BALL_R <= 0) {
+        s.bx = BALL_R;
+        s.bvx = Math.abs(s.bvx);
+      } else if (s.bx + BALL_R >= WIDTH) {
+        s.bx = WIDTH - BALL_R;
+        s.bvx = -Math.abs(s.bvx);
+      }
+      if (s.by - BALL_R <= 0) {
+        s.by = BALL_R;
+        s.bvy = Math.abs(s.bvy);
+      }
+
+      // Paddle: only while descending, using the ball's full extent.
+      if (
+        s.bvy > 0 &&
+        s.by + BALL_R >= PAD_Y &&
+        s.by - BALL_R <= PAD_Y + PAD_H &&
+        s.bx + BALL_R >= s.padX &&
+        s.bx - BALL_R <= s.padX + PAD_W
+      ) {
+        // Angle depends on where the ball struck; speed stays constant so a
+        // centre hit is not slower than an edge hit.
+        const rel = (s.bx - (s.padX + PAD_W / 2)) / (PAD_W / 2);
+        const angle = Math.max(-1, Math.min(1, rel)) * MAX_BOUNCE;
+        const speed = Math.hypot(s.bvx, s.bvy);
+        s.bvx = Math.sin(angle) * speed;
+        s.bvy = -Math.cos(angle) * speed;
+        s.by = PAD_Y - BALL_R;
+      }
+
+      if (s.by - BALL_R > HEIGHT) {
+        s.lives--;
+        if (s.lives <= 0) {
+          s.over = true;
+        } else {
+          s.stuck = true;
         }
       }
 
-      // Draw paddle (Neon Violet)
-      ctx.save();
-      
-      
-      ctx.fillStyle = "#8b5cf6";
-      ctx.fillRect(padX, h - 25 - padH, padW, padH);
-      ctx.restore();
+      // Bricks: one hit per step, reflected on the axis of least penetration.
+      // Flipping Y on every brick (the old behaviour) sent side hits straight
+      // through, and two hits in one frame cancelled out entirely.
+      for (let i = 0; i < s.bricks.length; i++) {
+        const b = s.bricks[i];
+        const closestX = Math.max(b.x, Math.min(s.bx, b.x + BRICK_W));
+        const closestY = Math.max(b.y, Math.min(s.by, b.y + BRICK_H));
+        const dx = s.bx - closestX;
+        const dy = s.by - closestY;
+        if (dx * dx + dy * dy > BALL_R * BALL_R) continue;
 
-      // Draw ball (Neon White)
-      ctx.save();
-      
-      
+        const overlapX = BALL_R - Math.abs(dx);
+        const overlapY = BALL_R - Math.abs(dy);
+        if (overlapX < overlapY) {
+          s.bvx = dx < 0 ? -Math.abs(s.bvx) : Math.abs(s.bvx);
+          s.bx += dx < 0 ? -overlapX : overlapX;
+        } else {
+          s.bvy = dy < 0 ? -Math.abs(s.bvy) : Math.abs(s.bvy);
+          s.by += dy < 0 ? -overlapY : overlapY;
+        }
+
+        b.hp--;
+        s.score += b.hp === 0 ? 20 : 10;
+        if (b.hp === 0) s.bricks.splice(i, 1);
+        break;
+      }
+
+      if (s.bricks.length === 0) {
+        s.score += 500 * s.level;
+        s.level++;
+        s.bricks = buildBricks(s.level);
+        s.stuck = true;
+        s.banner = 1.5;
+      }
+
+      if (s.over && !s.reported) {
+        s.reported = true;
+        const final = s.score;
+        setTimeout(() => onGameOverRef.current(final), 1200);
+      }
+    },
+
+    render: () => {
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+      const s = stateRef.current;
+
+      ctx.fillStyle = "#09090b";
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      for (const b of s.bricks) {
+        ctx.fillStyle = b.color;
+        ctx.globalAlpha = b.hp > 1 ? 1 : 0.85;
+        ctx.fillRect(b.x, b.y, BRICK_W, BRICK_H);
+        if (b.hp > 1) {
+          ctx.strokeStyle = "rgba(255,255,255,0.6)";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(b.x + 1, b.y + 1, BRICK_W - 2, BRICK_H - 2);
+        }
+      }
+      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = "#8b5cf6";
+      ctx.fillRect(s.padX, PAD_Y, PAD_W, PAD_H);
+
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
-      ctx.arc(bx, by, brad, 0, Math.PI * 2);
+      ctx.arc(s.bx, s.by, BALL_R, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
 
-      if (!isGameOver) animId = requestAnimationFrame(update);
-    };
+      ctx.textAlign = "left";
+      ctx.font = "bold 13px system-ui, sans-serif";
+      ctx.fillStyle = "#a1a1aa";
+      ctx.fillText(`SCORE  ${s.score}`, 24, 32);
+      ctx.fillText(`LEVEL  ${s.level}`, 24, 52);
+      ctx.textAlign = "right";
+      ctx.fillText("♥ ".repeat(s.lives).trim(), WIDTH - 24, 32);
 
-    if (!isGameOver) animId = requestAnimationFrame(update);
+      if (s.stuck && s.banner <= 0) {
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(255,255,255,0.8)";
+        ctx.font = "bold 18px system-ui, sans-serif";
+        ctx.fillText("Space or tap to launch  ·  ← → or drag to move", WIDTH / 2, HEIGHT / 2 + 60);
+      }
 
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-      cancelAnimationFrame(animId);
-    };
-  }, [onGameOver]);
+      if (s.banner > 0) {
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 40px system-ui, sans-serif";
+        ctx.fillText(`LEVEL ${s.level}`, WIDTH / 2, HEIGHT / 2);
+      }
 
-  return <canvas ref={canvasRef} width={800} height={600} className="w-full h-full block bg-zinc-950" />;
+      if (s.paused) drawPauseOverlay(ctx, WIDTH, HEIGHT);
+      if (s.over) drawGameOverFlash(ctx, WIDTH, HEIGHT);
+    },
+  });
+
+  return (
+    <canvas
+      ref={canvasRef}
+      onMouseDown={launch}
+      className="block h-full w-full touch-none bg-zinc-950"
+      aria-label="Breakout game"
+    />
+  );
 };

@@ -6,9 +6,7 @@ import { ArrowLeft01Icon, Trophy, GamepadIcon } from "@hugeicons/core-free-icons
 import { getGameBySlug, getGamesByCategory, getAllGames } from "@/lib/games";
 import SaveGameButton from "@/components/SaveGameButton";
 import GameScreen from "@/components/GameScreen";
-import GameConsole from "@/components/GameConsole";
 import Leaderboard from "@/components/Leaderboard";
-import { isPhaserGame } from "@/lib/gameRegistry";
 import { GameCard } from "@/components/GameCard";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/badge";
@@ -118,11 +116,7 @@ export default async function GameDetailPage({ params }: PageProps) {
             
             {/* Play Viewport Column */}
             <div className="lg:col-span-2 space-y-6">
-              {isPhaserGame(game.slug) ? (
-                <GameConsole gameId={game.id} gameTitle={game.title} gameSlug={game.slug} />
-              ) : (
-                <GameScreen gameId={game.id} gameTitle={game.title} gameSlug={game.slug} />
-              )}
+              <GameScreen gameId={game.id} gameTitle={game.title} gameSlug={game.slug} />
               
               {/* Game Info Panel */}
               <GlassCard glowColor="none" className="border-white/5 bg-zinc-900/20! p-6">

@@ -82,6 +82,11 @@ export interface GameInputOptions {
   onTap?: (x: number, y: number) => void;
   /** Fires when the pause action is pressed. */
   onPause?: () => void;
+  /**
+   * Fires once per discrete press or swipe, for turn-based games that react
+   * to events rather than polling inside a loop (2048, board games).
+   */
+  onAction?: (action: GameAction) => void;
 }
 
 export function useGameInput(options: GameInputOptions = {}) {
@@ -124,6 +129,7 @@ export function useGameInput(options: GameInputOptions = {}) {
       if (!held.has(action)) {
         pressed.set(action, (pressed.get(action) ?? 0) + 1);
         pushDirection(action);
+        optionsRef.current.onAction?.(action);
       }
       held.add(action);
     };
@@ -196,6 +202,7 @@ export function useGameInput(options: GameInputOptions = {}) {
       held.add(action);
       pressed.set(action, (pressed.get(action) ?? 0) + 1);
       pushDirection(action);
+      optionsRef.current.onAction?.(action);
       touchMoved = true;
 
       // A swipe is a discrete gesture; drop the held state on the next frame so

@@ -1,334 +1,481 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+
+import React, { useRef } from "react";
 import { GameProps } from "./types";
+import {
+  useGameLoop,
+  useGameInput,
+  useGameCanvas,
+  useLatest,
+  drawPauseOverlay,
+  drawGameOverFlash,
+} from "@/lib/game-engine";
+
+const WIDTH = 800;
+const HEIGHT = 600;
+const COLS = 15;
+const ROWS = 11;
+const TS = 40;
+const OFF_X = (WIDTH - COLS * TS) / 2;
+const OFF_Y = (HEIGHT - ROWS * TS) / 2;
+
+const MAP = [
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,0,0,0,0,1,0,0,0,1,0,0,0,0,1],
+  [1,0,1,1,0,1,0,1,0,1,0,1,1,0,1],
+  [1,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
+  [1,1,0,1,1,1,0,1,0,1,1,1,0,1,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,1,0,1,1,1,0,1,0,1,1,1,0,1,1],
+  [1,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
+  [1,0,1,1,0,1,0,1,0,1,0,1,1,0,1],
+  [1,0,0,0,0,1,0,0,0,1,0,0,0,0,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+];
+
+const PLAYER_SPAWN = { c: 7, r: 5 };
+const POWER_CELLS = new Set(["1,1", "13,1", "1,9", "13,9"]);
+const PLAYER_R = 14;
+
+const PLAYER_SPEED = 135;
+const GHOST_SPEED = 112;
+const GHOST_SPEED_PER_LEVEL = 7;
+const GHOST_SPEED_MAX = 150;
+const FRIGHT_SPEED = 68;
+const FRIGHT_TIME = 6.5;
+const FRIGHT_TIME_MIN = 2.5;
+/** Ghosts alternate between hunting and retreating to their corner. */
+const SCATTER_TIME = 6;
+const CHASE_TIME = 18;
+/** Seconds a ghost sits at home after being eaten. */
+const DORMANT_TIME = 2.2;
+const DEATH_FREEZE = 1.4;
+
+type Dir = { dx: number; dy: number };
+const NONE: Dir = { dx: 0, dy: 0 };
+const DIRS: Dir[] = [
+  { dx: 1, dy: 0 },
+  { dx: -1, dy: 0 },
+  { dx: 0, dy: 1 },
+  { dx: 0, dy: -1 },
+];
+const KEY_DIRS: Record<string, Dir> = {
+  right: DIRS[0],
+  left: DIRS[1],
+  down: DIRS[2],
+  up: DIRS[3],
+};
+
+type Mover = { x: number; y: number; dir: Dir };
+
+type Ghost = Mover & {
+  color: string;
+  home: { c: number; r: number };
+  /** Personality: how far ahead of the player this ghost aims. */
+  lead: number;
+  dormant: number;
+};
+
+function centerOf(c: number, r: number) {
+  return { x: c * TS + TS / 2, y: r * TS + TS / 2 };
+}
+
+function isWall(c: number, r: number) {
+  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return true;
+  return MAP[r][c] === 1;
+}
+
+function tileOf(m: Mover) {
+  return { c: Math.floor(m.x / TS), r: Math.floor(m.y / TS) };
+}
+
+function buildDots() {
+  const dots = new Set<string>();
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (MAP[r][c] === 0) dots.add(`${c},${r}`);
+    }
+  }
+  return dots;
+}
+
+function makeGhosts(): Ghost[] {
+  const spec = [
+    { color: "#ef4444", home: { c: 1, r: 1 }, lead: 0 },
+    { color: "#ec4899", home: { c: 13, r: 1 }, lead: 4 },
+    { color: "#06b6d4", home: { c: 1, r: 9 }, lead: 2 },
+    { color: "#f97316", home: { c: 13, r: 9 }, lead: -2 },
+  ];
+  return spec.map((g) => ({
+    ...centerOf(g.home.c, g.home.r),
+    dir: NONE,
+    dormant: 0,
+    ...g,
+  }));
+}
+
+function initialState() {
+  return {
+    player: { ...centerOf(PLAYER_SPAWN.c, PLAYER_SPAWN.r), dir: NONE } as Mover,
+    wantDir: NONE as Dir,
+    ghosts: makeGhosts(),
+    dots: buildDots(),
+    fright: 0,
+    frightCombo: 0,
+    modeTimer: SCATTER_TIME,
+    scatter: true,
+    freeze: 0,
+    level: 1,
+    score: 0,
+    lives: 3,
+    mouth: 0,
+    started: false,
+    banner: 0,
+    paused: false,
+    over: false,
+    reported: false,
+  };
+}
+
+/**
+ * Move an entity along its direction by `dist` pixels, snapping to tile
+ * centres as it crosses them so that turns are only taken exactly on the grid.
+ * `decide` is called at each centre and returns the direction to continue in.
+ */
+function advance(m: Mover, dist: number, decide: (m: Mover) => Dir) {
+  let guard = 8;
+  while (dist > 0 && guard-- > 0) {
+    if (m.dir.dx === 0 && m.dir.dy === 0) {
+      const next = decide(m);
+      if (next.dx === 0 && next.dy === 0) return;
+      m.dir = next;
+    }
+
+    const t = tileOf(m);
+    const center = centerOf(t.c, t.r);
+    let ahead = (center.x - m.x) * m.dir.dx + (center.y - m.y) * m.dir.dy;
+    let target = center;
+    // At or past this tile's centre, the next decision point is the centre of
+    // the tile ahead. (`<=` matters: exactly on centre must not re-target it,
+    // or the entity never leaves the spot.)
+    if (ahead <= 0) {
+      target = { x: center.x + m.dir.dx * TS, y: center.y + m.dir.dy * TS };
+      ahead += TS;
+    }
+
+    if (ahead > dist) {
+      m.x += m.dir.dx * dist;
+      m.y += m.dir.dy * dist;
+      return;
+    }
+
+    m.x = target.x;
+    m.y = target.y;
+    dist -= ahead;
+    const next = decide(m);
+    if (next.dx === 0 && next.dy === 0) {
+      m.dir = NONE;
+      return;
+    }
+    m.dir = next;
+  }
+}
 
 export const ClassicPacman: React.FC<GameProps> = ({ onGameOver }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { canvasRef, ctxRef } = useGameCanvas(WIDTH, HEIGHT);
+  const onGameOverRef = useLatest(onGameOver);
+  const stateRef = useRef(initialState());
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  const input = useGameInput({
+    target: canvasRef,
+    queueDirections: true,
+    onPause: () => {
+      const s = stateRef.current;
+      if (!s.over && s.started) s.paused = !s.paused;
+    },
+  });
 
-    let animId: number;
-    let isGameOver = false;
-    const w = canvas.width;
-    const h = canvas.height;
-
-    // Simple Grid Map (15 cols, 11 rows)
-    const cols = 15;
-    const rows = 11;
-    const ts = 40; // tile size
-    const offsetX = (w - cols * ts) / 2;
-    const offsetY = (h - rows * ts) / 2;
-
-    const MAP = [
-      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-      [1,0,0,0,0,1,0,0,0,1,0,0,0,0,1],
-      [1,0,1,1,0,1,0,1,0,1,0,1,1,0,1],
-      [1,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
-      [1,1,0,1,1,1,0,1,0,1,1,1,0,1,1],
-      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-      [1,1,0,1,1,1,0,1,0,1,1,1,0,1,1],
-      [1,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
-      [1,0,1,1,0,1,0,1,0,1,0,1,1,0,1],
-      [1,0,0,0,0,1,0,0,0,1,0,0,0,0,1],
-      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    ];
-
-    // Initialize Dots
-    interface Dot {
-      r: number;
-      c: number;
-      active: boolean;
-      power: boolean;
+  const resetPositions = (s: ReturnType<typeof initialState>) => {
+    s.player = { ...centerOf(PLAYER_SPAWN.c, PLAYER_SPAWN.r), dir: NONE };
+    s.wantDir = NONE;
+    for (const g of s.ghosts) {
+      const home = centerOf(g.home.c, g.home.r);
+      g.x = home.x;
+      g.y = home.y;
+      g.dir = NONE;
+      g.dormant = 0;
     }
-    const dots: Dot[] = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (MAP[r][c] === 0) {
-          // Power pellet corner locations
-          const power = (r === 1 && c === 1) || (r === 9 && c === 1) || (r === 1 && c === 13) || (r === 9 && c === 13);
-          dots.push({ r, c, active: true, power });
-        }
+    s.fright = 0;
+  };
+
+  useGameLoop({
+    step: 1000 / 120,
+    update: (dt) => {
+      const s = stateRef.current;
+      const io = input.current;
+      if (!io || s.over || s.paused) return;
+
+      const queued = io.shiftDirection();
+      if (queued) {
+        s.wantDir = KEY_DIRS[queued];
+        s.started = true;
       }
-    }
+      if (!s.started) return;
 
-    // Player
-    let px = 7 * ts + ts/2;
-    let py = 5 * ts + ts/2;
-    let pDir = { x: 0, y: 0 };
-    let pNextDir = { x: 0, y: 0 };
-    const pSpeed = 2;
-    const playerRadius = 14;
-
-    // Ghosts
-    interface Ghost {
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      color: string;
-      frightened: number; // timer
-    }
-    const ghosts: Ghost[] = [
-      { x: 1 * ts + ts/2, y: 1 * ts + ts/2, vx: pSpeed, vy: 0, color: "#ef4444", frightened: 0 },
-      { x: 13 * ts + ts/2, y: 1 * ts + ts/2, vx: -pSpeed, vy: 0, color: "#ec4899", frightened: 0 },
-      { x: 1 * ts + ts/2, y: 9 * ts + ts/2, vx: pSpeed, vy: 0, color: "#06b6d4", frightened: 0 },
-    ];
-
-    let score = 0;
-    let lives = 3;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "w", "s", "a", "d"].includes(e.key.toLowerCase())) {
-        e.preventDefault();
+      if (s.banner > 0) {
+        s.banner -= dt;
+        return;
       }
-      const key = e.key.toLowerCase();
-      if (key === "arrowleft" || key === "a") pNextDir = { x: -pSpeed, y: 0 };
-      if (key === "arrowright" || key === "d") pNextDir = { x: pSpeed, y: 0 };
-      if (key === "arrowup" || key === "w") pNextDir = { x: 0, y: -pSpeed };
-      if (key === "arrowdown" || key === "s") pNextDir = { x: 0, y: pSpeed };
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    const checkWall = (x: number, y: number) => {
-      // Find grid tile center coords
-      const r = Math.floor(y / ts);
-      const c = Math.floor(x / ts);
-      if (r < 0 || r >= rows || c < 0 || c >= cols) return true;
-      return MAP[r][c] === 1;
-    };
-
-    const update = () => {
-      // Check if we can change direction (align to grid centers)
-      const curTileX = Math.floor(px / ts) * ts + ts / 2;
-      const curTileY = Math.floor(py / ts) * ts + ts / 2;
-      const isCenteredX = Math.abs(px - curTileX) < pSpeed;
-      const isCenteredY = Math.abs(py - curTileY) < pSpeed;
-
-      if (isCenteredX && isCenteredY) {
-        // apply next direction if wall free
-        if (pNextDir.x !== 0 || pNextDir.y !== 0) {
-          if (!checkWall(curTileX + Math.sign(pNextDir.x) * ts, curTileY + Math.sign(pNextDir.y) * ts)) {
-            pDir = pNextDir;
-            px = curTileX; // snap
-            py = curTileY;
-          }
-        }
-      }
-
-      // Move player if wall free
-      if (!checkWall(px + Math.sign(pDir.x) * (ts / 2 + 1), py + Math.sign(pDir.y) * (ts / 2 + 1))) {
-        px += pDir.x;
-        py += pDir.y;
-      }
-
-      // Eat dots
-      const pr = Math.floor(py / ts);
-      const pc = Math.floor(px / ts);
-      const activePellet = dots.find(d => d.r === pr && d.c === pc && d.active);
-      if (activePellet) {
-        activePellet.active = false;
-        score += activePellet.power ? 100 : 10;
-        
-        if (activePellet.power) {
-          // Trigger ghost scare
-          ghosts.forEach(g => { g.frightened = 350; });
-        }
-      }
-
-      // Update Ghosts
-      ghosts.forEach(g => {
-        if (g.frightened > 0) g.frightened--;
-
-        // Move ghost
-        const gxCenter = Math.floor(g.x / ts) * ts + ts / 2;
-        const gyCenter = Math.floor(g.y / ts) * ts + ts / 2;
-        
-        if (Math.abs(g.x - gxCenter) < pSpeed && Math.abs(g.y - gyCenter) < pSpeed) {
-          g.x = gxCenter; g.y = gyCenter; // snap
-          
-          // Random pathfinding when centered
-          const dirs = [
-            { x: pSpeed, y: 0 },
-            { x: -pSpeed, y: 0 },
-            { x: 0, y: pSpeed },
-            { x: 0, y: -pSpeed },
-          ];
-          
-          // remove backwards dir
-          const backDir = { x: -g.vx, y: -g.vy };
-          const validDirs = dirs.filter(d => {
-            if (d.x === backDir.x && d.y === backDir.y) return false;
-            return !checkWall(g.x + Math.sign(d.x) * ts, g.y + Math.sign(d.y) * ts);
-          });
-
-          const chosen = validDirs.length > 0 
-            ? validDirs[Math.floor(Math.random() * validDirs.length)] 
-            : backDir;
-          g.vx = chosen.x;
-          g.vy = chosen.y;
-        }
-
-        g.x += g.vx;
-        g.y += g.vy;
-
-        // Collision check Pacman <-> Ghost
-        const dist = Math.hypot(px - g.x, py - g.y);
-        if (dist < playerRadius + 10) {
-          if (g.frightened > 0) {
-            // Eat ghost
-            score += 200;
-            // Send back to spawn
-            g.x = 7 * ts + ts/2;
-            g.y = 5 * ts + ts/2;
-            g.frightened = 0;
-          } else {
-            // Lose Life
-            lives--;
-            if (lives <= 0) {
-              cancelAnimationFrame(animId);
-              isGameOver = true; onGameOver(score);
-              return;
-            }
-            // Reset position
-            px = 7 * ts + ts/2;
-            py = 5 * ts + ts/2;
-            pDir = { x: 0, y: 0 };
-            pNextDir = { x: 0, y: 0 };
-          }
-        }
-      });
-
-      // Win Condition
-      if (dots.filter(d => d.active).length === 0) {
-        cancelAnimationFrame(animId);
-        isGameOver = true; onGameOver(score + 1500); // clear win bonus
+      if (s.freeze > 0) {
+        s.freeze -= dt;
+        if (s.freeze <= 0) resetPositions(s);
         return;
       }
 
-      // Render
-      ctx.fillStyle = "#09090b";
-      ctx.fillRect(0, 0, w, h);
+      s.mouth += dt * 10;
 
-      // HUD
-      ctx.font = "semibold 12px sans-serif";
-      ctx.fillStyle = "#a1a1aa";
-      ctx.fillText(`SCORE: ${score}`, 25, 25);
-      ctx.fillText(`LIVES: ${"❤".repeat(lives)}`, w - 100, 25);
+      // Reversing is allowed anywhere; other turns wait for a tile centre.
+      const p = s.player;
+      if (s.wantDir.dx === -p.dir.dx && s.wantDir.dy === -p.dir.dy && (p.dir.dx || p.dir.dy)) {
+        p.dir = s.wantDir;
+      }
 
-      // Draw Map Walls (Neon Blue Blocks)
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          if (MAP[r][c] === 1) {
-            ctx.save();
-            ctx.strokeStyle = "rgba(59,130,246,0.3)";
-            ctx.lineWidth = 1;
-            ctx.strokeRect(offsetX + c * ts, offsetY + r * ts, ts, ts);
+      advance(p, PLAYER_SPEED * dt, (m) => {
+        const t = tileOf(m);
+        const want = s.wantDir;
+        if ((want.dx || want.dy) && !isWall(t.c + want.dx, t.r + want.dy)) return want;
+        if ((m.dir.dx || m.dir.dy) && !isWall(t.c + m.dir.dx, t.r + m.dir.dy)) return m.dir;
+        return NONE;
+      });
 
-            ctx.fillStyle = "rgba(37,99,235,0.08)";
-            ctx.fillRect(offsetX + c * ts + 2, offsetY + r * ts + 2, ts - 4, ts - 4);
-            ctx.restore();
+      const pt = tileOf(p);
+      const key = `${pt.c},${pt.r}`;
+      if (s.dots.has(key)) {
+        s.dots.delete(key);
+        if (POWER_CELLS.has(key)) {
+          s.score += 50;
+          s.fright = Math.max(FRIGHT_TIME_MIN, FRIGHT_TIME - (s.level - 1) * 0.6);
+          s.frightCombo = 0;
+          // Frightened ghosts reverse, as in the original.
+          for (const g of s.ghosts) {
+            if (g.dormant <= 0) g.dir = { dx: -g.dir.dx, dy: -g.dir.dy };
+          }
+        } else {
+          s.score += 10;
+        }
+      }
+
+      if (s.fright > 0) {
+        s.fright -= dt;
+      } else {
+        s.modeTimer -= dt;
+        if (s.modeTimer <= 0) {
+          s.scatter = !s.scatter;
+          s.modeTimer = s.scatter ? SCATTER_TIME : CHASE_TIME;
+        }
+      }
+
+      const ghostSpeed = Math.min(GHOST_SPEED_MAX, GHOST_SPEED + (s.level - 1) * GHOST_SPEED_PER_LEVEL);
+
+      for (const g of s.ghosts) {
+        if (g.dormant > 0) {
+          g.dormant -= dt;
+          continue;
+        }
+
+        const frightened = s.fright > 0;
+        const speed = frightened ? FRIGHT_SPEED : ghostSpeed;
+
+        advance(g, speed * dt, (m) => {
+          const t = tileOf(m);
+          const back = { dx: -m.dir.dx, dy: -m.dir.dy };
+          const options = DIRS.filter(
+            (d) => !(d.dx === back.dx && d.dy === back.dy) && !isWall(t.c + d.dx, t.r + d.dy)
+          );
+          if (options.length === 0) return back;
+          if (frightened) return options[Math.floor(Math.random() * options.length)];
+
+          // Chase: aim at a point ahead of the player so the four ghosts
+          // approach from different angles instead of forming a conga line.
+          // Scatter: retreat to the home corner, giving the player breathing room.
+          let target: { c: number; r: number };
+          if (s.scatter) {
+            target = g.home;
+          } else {
+            const pTile = tileOf(s.player);
+            target = {
+              c: pTile.c + s.player.dir.dx * g.lead,
+              r: pTile.r + s.player.dir.dy * g.lead,
+            };
+          }
+          // A little noise keeps them from being perfectly predictable.
+          if (Math.random() < 0.12) return options[Math.floor(Math.random() * options.length)];
+
+          let best = options[0];
+          let bestDist = Infinity;
+          for (const d of options) {
+            const dc = t.c + d.dx - target.c;
+            const dr = t.r + d.dy - target.r;
+            const dist = dc * dc + dr * dr;
+            if (dist < bestDist) {
+              bestDist = dist;
+              best = d;
+            }
+          }
+          return best;
+        });
+
+        if (Math.hypot(p.x - g.x, p.y - g.y) < PLAYER_R + 8) {
+          if (s.fright > 0) {
+            s.frightCombo++;
+            s.score += 200 * Math.pow(2, s.frightCombo - 1);
+            const home = centerOf(g.home.c, g.home.r);
+            g.x = home.x;
+            g.y = home.y;
+            g.dir = NONE;
+            g.dormant = DORMANT_TIME;
+          } else {
+            s.lives--;
+            if (s.lives <= 0) {
+              s.over = true;
+            } else {
+              s.freeze = DEATH_FREEZE;
+            }
+            break;
           }
         }
       }
 
-      // Draw Dots
-      dots.forEach(d => {
-        if (d.active) {
-          ctx.save();
-          if (d.power) {
-            
-            
-            ctx.fillStyle = "#facc15";
-            ctx.beginPath();
-            ctx.arc(offsetX + d.c * ts + ts / 2, offsetY + d.r * ts + ts / 2, 7, 0, Math.PI * 2);
-            ctx.fill();
-          } else {
-            ctx.fillStyle = "#facc15";
-            ctx.fillRect(offsetX + d.c * ts + ts / 2 - 2, offsetY + d.r * ts + ts / 2 - 2, 4, 4);
-          }
-          ctx.restore();
+      if (s.dots.size === 0 && !s.over) {
+        s.score += 1000 * s.level;
+        s.level++;
+        s.dots = buildDots();
+        resetPositions(s);
+        s.scatter = true;
+        s.modeTimer = SCATTER_TIME;
+        s.banner = 1.6;
+      }
+
+      if (s.over && !s.reported) {
+        s.reported = true;
+        const final = s.score;
+        setTimeout(() => onGameOverRef.current(final), 1200);
+      }
+    },
+
+    render: () => {
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+      const s = stateRef.current;
+
+      ctx.fillStyle = "#09090b";
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (MAP[r][c] !== 1) continue;
+          ctx.strokeStyle = "rgba(59,130,246,0.35)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(OFF_X + c * TS, OFF_Y + r * TS, TS, TS);
+          ctx.fillStyle = "rgba(37,99,235,0.09)";
+          ctx.fillRect(OFF_X + c * TS + 2, OFF_Y + r * TS + 2, TS - 4, TS - 4);
         }
-      });
+      }
 
-      // Draw Ghosts
-      ghosts.forEach(g => {
-        ctx.save();
-        const drawColor = g.frightened > 0 ? "#3b82f6" : g.color;
-        ctx.shadowColor = drawColor;
-        
-        ctx.fillStyle = drawColor;
+      ctx.fillStyle = "#facc15";
+      for (const key of s.dots) {
+        const [c, r] = key.split(",").map(Number);
+        const cx = OFF_X + c * TS + TS / 2;
+        const cy = OFF_Y + r * TS + TS / 2;
+        if (POWER_CELLS.has(key)) {
+          // Power pellets pulse so they read as special.
+          const pulse = 6 + Math.sin(s.mouth * 0.6) * 1.5;
+          ctx.beginPath();
+          ctx.arc(cx, cy, pulse, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillRect(cx - 2, cy - 2, 4, 4);
+        }
+      }
 
-        const gx = offsetX + g.x;
-        const gy = offsetY + g.y;
+      for (const g of s.ghosts) {
+        const gx = OFF_X + g.x;
+        const gy = OFF_Y + g.y;
+        const frightened = s.fright > 0 && g.dormant <= 0;
+        // Flash white as the fright timer runs out, warning the player.
+        const flashing = frightened && s.fright < 2 && Math.floor(s.fright * 6) % 2 === 0;
 
-        ctx.beginPath();
-        ctx.arc(gx, gy - 2, playerRadius, Math.PI, 0, false);
-        // ghost skirt
-        ctx.lineTo(gx + playerRadius, gy + playerRadius);
-        ctx.lineTo(gx + playerRadius / 2, gy + playerRadius / 1.5);
-        ctx.lineTo(gx, gy + playerRadius);
-        ctx.lineTo(gx - playerRadius / 2, gy + playerRadius / 1.5);
-        ctx.lineTo(gx - playerRadius, gy + playerRadius);
-        ctx.closePath();
-        ctx.fill();
+        if (g.dormant <= 0) {
+          ctx.fillStyle = flashing ? "#e5e7eb" : frightened ? "#3b82f6" : g.color;
+          ctx.beginPath();
+          ctx.arc(gx, gy - 2, PLAYER_R, Math.PI, 0);
+          ctx.lineTo(gx + PLAYER_R, gy + PLAYER_R);
+          ctx.lineTo(gx + PLAYER_R / 2, gy + PLAYER_R / 1.5);
+          ctx.lineTo(gx, gy + PLAYER_R);
+          ctx.lineTo(gx - PLAYER_R / 2, gy + PLAYER_R / 1.5);
+          ctx.lineTo(gx - PLAYER_R, gy + PLAYER_R);
+          ctx.closePath();
+          ctx.fill();
+        }
 
-        // Eyes
+        // Eyes always draw; a dormant ghost is just its eyes waiting at home.
         ctx.fillStyle = "#ffffff";
         ctx.beginPath();
         ctx.arc(gx - 5, gy - 2, 3.5, 0, Math.PI * 2);
         ctx.arc(gx + 5, gy - 2, 3.5, 0, Math.PI * 2);
         ctx.fill();
-
-        ctx.fillStyle = "#000000";
+        ctx.fillStyle = "#1e3a8a";
         ctx.beginPath();
-        ctx.arc(gx - 4.5, gy - 2, 1.5, 0, Math.PI * 2);
-        ctx.arc(gx + 5.5, gy - 2, 1.5, 0, Math.PI * 2);
+        ctx.arc(gx - 5 + g.dir.dx * 1.5, gy - 2 + g.dir.dy * 1.5, 1.6, 0, Math.PI * 2);
+        ctx.arc(gx + 5 + g.dir.dx * 1.5, gy - 2 + g.dir.dy * 1.5, 1.6, 0, Math.PI * 2);
         ctx.fill();
+      }
 
-        ctx.restore();
-      });
-
-      // Draw Pacman (Yellow Chomp Circle)
-      ctx.save();
-      
-      
+      const p = s.player;
+      const px = OFF_X + p.x;
+      const py = OFF_Y + p.y;
+      const moving = p.dir.dx !== 0 || p.dir.dy !== 0;
+      const chomp = moving ? Math.abs(Math.sin(s.mouth)) * 0.28 : 0.12;
+      const face = p.dir.dx > 0 ? 0 : p.dir.dx < 0 ? Math.PI : p.dir.dy > 0 ? Math.PI / 2 : p.dir.dy < 0 ? -Math.PI / 2 : 0;
       ctx.fillStyle = "#facc15";
-
-      const pacX = offsetX + px;
-      const pacY = offsetY + py;
-
-      // animate mouth chomp
-      const chompAngle = Math.abs(Math.sin(Date.now() * 0.012)) * 0.22;
-      const startAngle = chompAngle;
-      const endAngle = Math.PI * 2 - chompAngle;
-      
-      // align mouth direction
-      const angleOffset = pDir.x > 0 ? 0 : pDir.x < 0 ? Math.PI : pDir.y > 0 ? Math.PI / 2 : pDir.y < 0 ? -Math.PI / 2 : 0;
-
       ctx.beginPath();
-      ctx.moveTo(pacX, pacY);
-      ctx.arc(pacX, pacY, playerRadius, startAngle + angleOffset, endAngle + angleOffset);
-      ctx.lineTo(pacX, pacY);
+      ctx.moveTo(px, py);
+      ctx.arc(px, py, PLAYER_R, face + chomp, face + Math.PI * 2 - chomp);
       ctx.closePath();
       ctx.fill();
 
-      ctx.restore();
+      ctx.textAlign = "left";
+      ctx.font = "bold 13px system-ui, sans-serif";
+      ctx.fillStyle = "#a1a1aa";
+      ctx.fillText(`SCORE  ${s.score}`, 24, 30);
+      ctx.fillText(`LEVEL  ${s.level}`, 24, 50);
+      ctx.textAlign = "right";
+      ctx.fillText("♥ ".repeat(s.lives).trim(), WIDTH - 24, 30);
 
-      if (!isGameOver) animId = requestAnimationFrame(update);
-    };
+      if (!s.started) {
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.font = "bold 20px system-ui, sans-serif";
+        ctx.fillText("Arrow keys, WASD, or swipe to start", WIDTH / 2, OFF_Y - 14);
+      }
 
-    if (!isGameOver) animId = requestAnimationFrame(update);
+      if (s.banner > 0) {
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 40px system-ui, sans-serif";
+        ctx.fillText(`LEVEL ${s.level}`, WIDTH / 2, HEIGHT / 2);
+      }
 
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      cancelAnimationFrame(animId);
-    };
-  }, [onGameOver]);
+      if (s.paused) drawPauseOverlay(ctx, WIDTH, HEIGHT);
+      if (s.over) drawGameOverFlash(ctx, WIDTH, HEIGHT);
+    },
+  });
 
-  return <canvas ref={canvasRef} width={800} height={600} className="w-full h-full block bg-zinc-950" />;
+  return (
+    <canvas
+      ref={canvasRef}
+      className="block h-full w-full touch-none bg-zinc-950"
+      aria-label="Pac-Man style game"
+    />
+  );
 };

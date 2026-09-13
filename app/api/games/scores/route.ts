@@ -6,7 +6,6 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const gameIdStr = searchParams.get("gameId");
-    const slug = searchParams.get("slug") || undefined;
 
     if (!gameIdStr) {
       return NextResponse.json({ error: "Missing gameId parameter" }, { status: 400 });
@@ -17,7 +16,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Invalid gameId parameter" }, { status: 400 });
     }
 
-    const topScores = await queryLeaderboard(gameId, slug);
+    const topScores = await queryLeaderboard(gameId);
     return NextResponse.json(topScores);
   } catch (error) {
     console.error("API GET scores error:", error);

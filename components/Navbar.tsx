@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { GamepadIcon, Trophy, Search01Icon, Menu01Icon, SparklesIcon, UserCircleIcon, StarIcon } from "@hugeicons/core-free-icons";
+import { Search01Icon, Menu01Icon, UserCircleIcon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader, SheetDescription } from "@/components/ui/sheet";
 import SearchBar from "@/components/SearchBar";

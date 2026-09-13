@@ -1,296 +1,372 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { GameProps } from "./types";
+import {
+  useGameLoop,
+  useGameInput,
+  useGameCanvas,
+  useLatest,
+  drawPauseOverlay,
+  drawGameOverFlash,
+} from "@/lib/game-engine";
+
+const WIDTH = 800;
+const HEIGHT = 600;
+
+const SHIP_R = 12;
+const TURN_SPEED = 4.2; // radians per second
+const THRUST = 420; // px per second squared
+const MAX_SPEED = 420;
+/** Fraction of velocity kept after one second of coasting. */
+const DAMPING = 0.35;
+/** Seconds of invulnerability after respawning, shown by blinking. */
+const RESPAWN_SHIELD = 2.5;
+
+const LASER_SPEED = 560;
+const LASER_LIFE = 1.1;
+const FIRE_COOLDOWN = 0.18;
+const MAX_LASERS = 5;
+
+const BIG = 42;
+const MEDIUM = 24;
+const SMALL = 13;
+
+type Asteroid = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  r: number;
+  rot: number;
+  spin: number;
+  shape: number[];
+};
+
+type Laser = { x: number; y: number; vx: number; vy: number; life: number };
+
+type Particle = { x: number; y: number; vx: number; vy: number; life: number };
+
+function makeAsteroid(x: number, y: number, r: number, speedScale: number): Asteroid {
+  const sides = 8 + Math.floor(Math.random() * 5);
+  const angle = Math.random() * Math.PI * 2;
+  // Smaller rocks move faster, so splitting raises the pressure.
+  const speed = (30 + Math.random() * 60 + (BIG - r) * 2.2) * speedScale;
+  return {
+    x,
+    y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    r,
+    rot: Math.random() * Math.PI * 2,
+    spin: (Math.random() - 0.5) * 1.6,
+    shape: Array.from({ length: sides }, () => 0.75 + Math.random() * 0.45),
+  };
+}
+
+/** Spawn rocks away from the ship so a new wave never starts with a collision. */
+function spawnWave(count: number, shipX: number, shipY: number, speedScale: number): Asteroid[] {
+  const rocks: Asteroid[] = [];
+  while (rocks.length < count) {
+    const x = Math.random() * WIDTH;
+    const y = Math.random() * HEIGHT;
+    if (Math.hypot(x - shipX, y - shipY) < 160) continue;
+    rocks.push(makeAsteroid(x, y, BIG, speedScale));
+  }
+  return rocks;
+}
+
+function initialState() {
+  return {
+    x: WIDTH / 2,
+    y: HEIGHT / 2,
+    angle: -Math.PI / 2,
+    vx: 0,
+    vy: 0,
+    thrusting: false,
+    shield: RESPAWN_SHIELD,
+    fireCooldown: 0,
+    lasers: [] as Laser[],
+    asteroids: spawnWave(4, WIDTH / 2, HEIGHT / 2, 1),
+    particles: [] as Particle[],
+    wave: 1,
+    score: 0,
+    lives: 3,
+    banner: 0,
+    paused: false,
+    over: false,
+    reported: false,
+  };
+}
+
+function wrap(v: number, max: number, margin: number) {
+  if (v < -margin) return max + margin;
+  if (v > max + margin) return -margin;
+  return v;
+}
 
 export const ClassicAsteroids: React.FC<GameProps> = ({ onGameOver }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { canvasRef, ctxRef } = useGameCanvas(WIDTH, HEIGHT);
+  const onGameOverRef = useLatest(onGameOver);
+  const stateRef = useRef(initialState());
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  const fire = () => {
+    const s = stateRef.current;
+    if (s.over || s.paused || s.banner > 0 || s.fireCooldown > 0) return;
+    if (s.lasers.length >= MAX_LASERS) return;
+    s.lasers.push({
+      x: s.x + Math.cos(s.angle) * SHIP_R * 1.5,
+      y: s.y + Math.sin(s.angle) * SHIP_R * 1.5,
+      vx: Math.cos(s.angle) * LASER_SPEED + s.vx * 0.5,
+      vy: Math.sin(s.angle) * LASER_SPEED + s.vy * 0.5,
+      life: LASER_LIFE,
+    });
+    s.fireCooldown = FIRE_COOLDOWN;
+  };
 
-    let animId: number;
-    let isGameOver = false;
-    const w = canvas.width;
-    const h = canvas.height;
-
-    // Ship
-    let sx = w / 2;
-    let sy = h / 2;
-    let sAngle = -Math.PI / 2;
-    let svx = 0;
-    let svy = 0;
-    const shipR = 12;
-
-    // Asteroids
-    interface Asteroid {
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      r: number;
-      sides: number;
-      offsets: number[];
+  const burst = (s: ReturnType<typeof initialState>, x: number, y: number, n: number) => {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 40 + Math.random() * 140;
+      s.particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.5 + Math.random() * 0.4 });
     }
-    const asteroids: Asteroid[] = [];
+  };
 
-    const makeAsteroid = (x: number, y: number, r: number) => {
-      const sides = Math.floor(Math.random() * 5) + 8;
-      const offsets = Array(sides).fill(0).map(() => Math.random() * 0.4 + 0.8);
-      const angleMultiplier = (Math.random() - 0.5) * 2;
-      return {
-        x,
-        y,
-        vx: angleMultiplier * 1.5,
-        vy: (Math.random() - 0.5) * 3,
-        r,
-        sides,
-        offsets,
-      };
-    };
+  const input = useGameInput({
+    target: canvasRef,
+    queueDirections: false,
+    enableSwipe: false,
+    onTap: fire,
+    onPause: () => {
+      const s = stateRef.current;
+      if (!s.over) s.paused = !s.paused;
+    },
+  });
 
-    // Initial asteroids
-    for (let i = 0; i < 4; i++) {
-      asteroids.push(makeAsteroid(Math.random() * w, Math.random() * h / 3, 40));
-    }
+  useGameLoop({
+    step: 1000 / 120,
+    update: (dt) => {
+      const s = stateRef.current;
+      const io = input.current;
+      if (!io || s.over || s.paused) return;
 
-    // Lasers
-    interface Laser {
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      life: number;
-    }
-    let lasers: Laser[] = [];
-
-    let score = 0;
-    let lives = 3;
-    const keysPressed: Record<string, boolean> = {};
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
-        e.preventDefault();
+      if (s.banner > 0) {
+        s.banner -= dt;
+        return;
       }
-      keysPressed[e.key] = true;
 
-      if (e.key === " ") {
-        // Shoot
-        lasers.push({
-          x: sx + Math.cos(sAngle) * shipR,
-          y: sy + Math.sin(sAngle) * shipR,
-          vx: Math.cos(sAngle) * 8,
-          vy: Math.sin(sAngle) * 8,
-          life: 60, // frames alive
-        });
+      s.fireCooldown = Math.max(0, s.fireCooldown - dt);
+      s.shield = Math.max(0, s.shield - dt);
+
+      if (io.isDown("left")) s.angle -= TURN_SPEED * dt;
+      if (io.isDown("right")) s.angle += TURN_SPEED * dt;
+
+      // Touch: dragging left/right of the ship turns it; dragging above thrusts.
+      const p = io.pointer();
+      if (p && io.isDown("primary")) {
+        const dx = p.x - s.x;
+        const dy = p.y - s.y;
+        const target = Math.atan2(dy, dx);
+        let diff = target - s.angle;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        s.angle += Math.max(-TURN_SPEED * dt, Math.min(TURN_SPEED * dt, diff));
       }
-    };
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-      keysPressed[e.key] = false;
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-
-    const triggerGameOver = (finalScore: number) => {
-      isGameOver = true;
-      cancelAnimationFrame(animId);
-      ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
-      ctx.fillRect(0, 0, w, h);
-      setTimeout(() => onGameOver(finalScore), 1500);
-    };
-
-    const update = () => {
-      // Rotate ship
-      if (keysPressed["ArrowLeft"]) sAngle -= 0.07;
-      if (keysPressed["ArrowRight"]) sAngle += 0.07;
-
-      // Thrust ship
-      if (keysPressed["ArrowUp"]) {
-        svx += Math.cos(sAngle) * 0.12;
-        svy += Math.sin(sAngle) * 0.12;
+      s.thrusting = io.isDown("up") || (p !== null && io.isDown("primary"));
+      if (s.thrusting) {
+        s.vx += Math.cos(s.angle) * THRUST * dt;
+        s.vy += Math.sin(s.angle) * THRUST * dt;
       }
-      // Apply friction
-      svx *= 0.985;
-      svy *= 0.985;
 
-      sx += svx;
-      sy += svy;
+      // Exponential damping expressed per second, so coasting feels identical
+      // at any tick rate; the old per-frame multiplier decayed 2.4x faster on
+      // a 144Hz display.
+      const damp = Math.pow(DAMPING, dt);
+      s.vx *= damp;
+      s.vy *= damp;
+      const speed = Math.hypot(s.vx, s.vy);
+      if (speed > MAX_SPEED) {
+        s.vx = (s.vx / speed) * MAX_SPEED;
+        s.vy = (s.vy / speed) * MAX_SPEED;
+      }
 
-      // Wrap-around ship
-      if (sx < 0) sx = w;
-      if (sx > w) sx = 0;
-      if (sy < 0) sy = h;
-      if (sy > h) sy = 0;
+      s.x = wrap(s.x + s.vx * dt, WIDTH, SHIP_R);
+      s.y = wrap(s.y + s.vy * dt, HEIGHT, SHIP_R);
 
-      // Update Lasers
-      lasers.forEach(l => {
-        l.x += l.vx;
-        l.y += l.vy;
-        l.life--;
+      if (io.consumePress("primary") || io.isDown("primary")) fire();
 
-        // Wrap lasers
-        if (l.x < 0) l.x = w;
-        if (l.x > w) l.x = 0;
-        if (l.y < 0) l.y = h;
-        if (l.y > h) l.y = 0;
-      });
-      lasers = lasers.filter(l => l.life > 0);
+      for (const l of s.lasers) {
+        l.x = wrap(l.x + l.vx * dt, WIDTH, 0);
+        l.y = wrap(l.y + l.vy * dt, HEIGHT, 0);
+        l.life -= dt;
+      }
+      s.lasers = s.lasers.filter((l) => l.life > 0);
 
-      // Update Asteroids
-      asteroids.forEach(a => {
-        a.x += a.vx;
-        a.y += a.vy;
+      for (const a of s.asteroids) {
+        a.x = wrap(a.x + a.vx * dt, WIDTH, a.r);
+        a.y = wrap(a.y + a.vy * dt, HEIGHT, a.r);
+        a.rot += a.spin * dt;
+      }
 
-        // Wrap asteroids
-        if (a.x < -a.r) a.x = w + a.r;
-        if (a.x > w + a.r) a.x = -a.r;
-        if (a.y < -a.r) a.y = h + a.r;
-        if (a.y > h + a.r) a.y = -a.r;
-      });
+      for (const pt of s.particles) {
+        pt.x += pt.vx * dt;
+        pt.y += pt.vy * dt;
+        pt.life -= dt;
+      }
+      s.particles = s.particles.filter((pt) => pt.life > 0);
 
-      // Laser collision with Asteroids
-      for (let li = lasers.length - 1; li >= 0; li--) {
-        const l = lasers[li];
-        for (let ai = asteroids.length - 1; ai >= 0; ai--) {
-          const a = asteroids[ai];
-          const dist = Math.hypot(l.x - a.x, l.y - a.y);
-          if (dist < a.r) {
-            // hit!
-            lasers.splice(li, 1);
-            score += Math.floor(1000 / a.r);
+      const speedScale = 1 + (s.wave - 1) * 0.15;
 
-            // split if large enough
-            if (a.r > 15) {
-              asteroids.push(makeAsteroid(a.x, a.y, a.r / 2));
-              asteroids.push(makeAsteroid(a.x, a.y, a.r / 2));
+      for (let li = s.lasers.length - 1; li >= 0; li--) {
+        const l = s.lasers[li];
+        for (let ai = s.asteroids.length - 1; ai >= 0; ai--) {
+          const a = s.asteroids[ai];
+          if (Math.hypot(l.x - a.x, l.y - a.y) >= a.r) continue;
+
+          s.lasers.splice(li, 1);
+          s.asteroids.splice(ai, 1);
+          s.score += a.r >= BIG ? 20 : a.r >= MEDIUM ? 50 : 100;
+          burst(s, a.x, a.y, a.r >= BIG ? 10 : 6);
+
+          if (a.r >= BIG) {
+            s.asteroids.push(makeAsteroid(a.x, a.y, MEDIUM, speedScale), makeAsteroid(a.x, a.y, MEDIUM, speedScale));
+          } else if (a.r >= MEDIUM) {
+            s.asteroids.push(makeAsteroid(a.x, a.y, SMALL, speedScale), makeAsteroid(a.x, a.y, SMALL, speedScale));
+          }
+          break;
+        }
+      }
+
+      if (s.shield <= 0) {
+        for (const a of s.asteroids) {
+          if (Math.hypot(s.x - a.x, s.y - a.y) < a.r * 0.85 + SHIP_R * 0.7) {
+            s.lives--;
+            burst(s, s.x, s.y, 16);
+            if (s.lives <= 0) {
+              s.over = true;
+            } else {
+              s.x = WIDTH / 2;
+              s.y = HEIGHT / 2;
+              s.vx = 0;
+              s.vy = 0;
+              s.angle = -Math.PI / 2;
+              s.shield = RESPAWN_SHIELD;
             }
-            asteroids.splice(ai, 1);
             break;
           }
         }
       }
 
-      // Ship collision with Asteroids
-      for (let ai = asteroids.length - 1; ai >= 0; ai--) {
-        const a = asteroids[ai];
-        const dist = Math.hypot(sx - a.x, sy - a.y);
-        if (dist < a.r + shipR) {
-          lives--;
-          if (lives <= 0) {
-            triggerGameOver(score);
-            return;
-          }
-          // Reset ship to middle
-          sx = w / 2;
-          sy = h / 2;
-          svx = 0;
-          svy = 0;
-          sAngle = -Math.PI / 2;
-          // Splat colliding asteroid
-          asteroids.splice(ai, 1);
-          break;
-        }
+      if (s.asteroids.length === 0) {
+        s.score += 250 * s.wave;
+        s.wave++;
+        s.asteroids = spawnWave(3 + s.wave, s.x, s.y, 1 + (s.wave - 1) * 0.15);
+        s.lasers = [];
+        s.banner = 1.5;
+        s.shield = RESPAWN_SHIELD;
       }
 
-      // Spawn new asteroids if all destroyed
-      if (asteroids.length === 0) {
-        for (let i = 0; i < 5; i++) {
-          asteroids.push(makeAsteroid(Math.random() * w, Math.random() * h / 3, 40));
-        }
+      if (s.over && !s.reported) {
+        s.reported = true;
+        const final = s.score;
+        setTimeout(() => onGameOverRef.current(final), 1200);
       }
+    },
 
-      // Render
+    render: () => {
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+      const s = stateRef.current;
+
       ctx.fillStyle = "#09090b";
-      ctx.fillRect(0, 0, w, h);
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      // Draw HUD
-      ctx.font = "semibold 12px sans-serif";
-      ctx.fillStyle = "#a1a1aa";
-      ctx.fillText(`SCORE: ${score}`, 25, 25);
-      ctx.fillText(`SHIPS: ${"▲".repeat(lives)}`, w - 100, 25);
+      ctx.fillStyle = "#fbbf24";
+      for (const pt of s.particles) {
+        ctx.globalAlpha = Math.min(1, pt.life * 2);
+        ctx.fillRect(pt.x - 1.5, pt.y - 1.5, 3, 3);
+      }
+      ctx.globalAlpha = 1;
 
-      // Draw Lasers (Neon Cyan Sparks)
-      lasers.forEach(l => {
-        ctx.save();
-        
-        
-        ctx.fillStyle = "#22d3ee";
+      ctx.fillStyle = "#22d3ee";
+      for (const l of s.lasers) {
         ctx.beginPath();
         ctx.arc(l.x, l.y, 2.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.restore();
-      });
+      }
 
-      // Draw Asteroids (Neon Orange Polygons)
-      asteroids.forEach(a => {
-        ctx.save();
-        
-        
-        ctx.strokeStyle = "#f97316";
-        ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#f97316";
+      ctx.lineWidth = 1.5;
+      for (const a of s.asteroids) {
         ctx.beginPath();
-        for (let i = 0; i < a.sides; i++) {
-          const ang = (i / a.sides) * Math.PI * 2;
-          const dist = a.r * a.offsets[i];
-          const px = a.x + Math.cos(ang) * dist;
-          const py = a.y + Math.sin(ang) * dist;
+        for (let i = 0; i < a.shape.length; i++) {
+          const ang = a.rot + (i / a.shape.length) * Math.PI * 2;
+          const d = a.r * a.shape[i];
+          const px = a.x + Math.cos(ang) * d;
+          const py = a.y + Math.sin(ang) * d;
           if (i === 0) ctx.moveTo(px, py);
           else ctx.lineTo(px, py);
         }
         ctx.closePath();
         ctx.stroke();
-        ctx.restore();
-      });
-
-      // Draw Ship (Neon Cyan Triangle)
-      ctx.save();
-      
-      
-      ctx.strokeStyle = "#22d3ee";
-      ctx.fillStyle = "#0891b2";
-      ctx.lineWidth = 2;
-
-      ctx.translate(sx, sy);
-      ctx.rotate(sAngle);
-      ctx.beginPath();
-      ctx.moveTo(shipR * 1.5, 0);
-      ctx.lineTo(-shipR, -shipR * 0.8);
-      ctx.lineTo(-shipR * 0.4, 0);
-      ctx.lineTo(-shipR, shipR * 0.8);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // Thruster Flame
-      if (keysPressed["ArrowUp"]) {
-        ctx.strokeStyle = "#ef4444";
-        ctx.beginPath();
-        ctx.moveTo(-shipR * 0.5, 0);
-        ctx.lineTo(-shipR * 1.8, -shipR * 0.4);
-        ctx.lineTo(-shipR * 2.2, 0);
-        ctx.lineTo(-shipR * 1.8, shipR * 0.4);
-        ctx.closePath();
-        ctx.stroke();
       }
 
-      ctx.restore();
+      const blink = s.shield > 0 && Math.floor(s.shield * 8) % 2 === 0;
+      if (!blink && !s.over) {
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.rotate(s.angle);
+        ctx.strokeStyle = "#22d3ee";
+        ctx.fillStyle = "#0891b2";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(SHIP_R * 1.5, 0);
+        ctx.lineTo(-SHIP_R, -SHIP_R * 0.8);
+        ctx.lineTo(-SHIP_R * 0.4, 0);
+        ctx.lineTo(-SHIP_R, SHIP_R * 0.8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        if (s.thrusting) {
+          ctx.strokeStyle = "#ef4444";
+          ctx.beginPath();
+          ctx.moveTo(-SHIP_R * 0.5, 0);
+          ctx.lineTo(-SHIP_R * 1.8, -SHIP_R * 0.4);
+          ctx.lineTo(-SHIP_R * 2.2, 0);
+          ctx.lineTo(-SHIP_R * 1.8, SHIP_R * 0.4);
+          ctx.closePath();
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
 
-      if (!isGameOver) animId = requestAnimationFrame(update);
-    };
+      ctx.textAlign = "left";
+      ctx.font = "bold 13px system-ui, sans-serif";
+      ctx.fillStyle = "#a1a1aa";
+      ctx.fillText(`SCORE  ${s.score}`, 24, 32);
+      ctx.fillText(`WAVE  ${s.wave}`, 24, 52);
+      ctx.textAlign = "right";
+      ctx.fillText("▲ ".repeat(s.lives).trim(), WIDTH - 24, 32);
 
-    if (!isGameOver) animId = requestAnimationFrame(update);
+      if (s.banner > 0) {
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 40px system-ui, sans-serif";
+        ctx.fillText(`WAVE ${s.wave}`, WIDTH / 2, HEIGHT / 2);
+      }
 
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-      cancelAnimationFrame(animId);
-    };
-  }, [onGameOver]);
+      if (s.paused) drawPauseOverlay(ctx, WIDTH, HEIGHT);
+      if (s.over) drawGameOverFlash(ctx, WIDTH, HEIGHT);
+    },
+  });
 
-  return <canvas ref={canvasRef} width={800} height={600} className="w-full h-full block bg-zinc-950" />;
+  return (
+    <canvas
+      ref={canvasRef}
+      onMouseDown={fire}
+      className="block h-full w-full touch-none bg-zinc-950"
+      aria-label="Asteroids game"
+    />
+  );
 };

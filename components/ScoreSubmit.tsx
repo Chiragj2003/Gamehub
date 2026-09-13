@@ -5,7 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { SparklesIcon, CheckmarkCircle01Icon, Share01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { saveLocalScore } from "@/lib/gameRegistry";
+import { saveLocalScore } from "@/lib/localScores";
 
 interface ScoreSubmitProps {
   gameId: number;
@@ -90,35 +90,14 @@ export default function ScoreSubmit({
     }
   };
 
-  const getAccentColor = () => {
-    switch (gameSlug) {
-      case "neon-snake":
-        return "green";
-      case "space-defender":
-        return "cyan";
-      case "memory-matrix":
-        return "violet";
-      default:
-        return "cyan";
-    }
-  };
+  const borderClass = "border-neon-cyan/30";
 
-  const borderClass = {
-    green: "border-neon-green/30",
-    cyan: "border-neon-cyan/30",
-    violet: "border-neon-violet/30"
-  }[getAccentColor()];
-
-  const textClass = {
-    green: "text-neon-green text-glow-green",
-    cyan: "text-neon-cyan text-glow-cyan",
-    violet: "text-neon-violet text-glow-violet"
-  }[getAccentColor()];
+  const textClass = "text-neon-cyan text-glow-cyan";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
       <GlassCard
-        glowColor={getAccentColor() as "green" | "cyan" | "violet"}
+        glowColor="cyan"
         className={`w-full max-w-md border p-8 space-y-6 ${borderClass}`}
       >
         <div className="text-center space-y-2">

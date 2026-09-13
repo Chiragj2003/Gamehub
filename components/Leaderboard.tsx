@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Trophy, CalendarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { type LocalScoreEntry, getLocalScores } from "@/lib/gameRegistry";
+import { type LocalScoreEntry, getLocalScores } from "@/lib/localScores";
 
 interface ScoreEntry {
   playerName: string;
@@ -73,23 +73,11 @@ export default function Leaderboard({ gameId, gameSlug }: LeaderboardProps) {
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
 
-  const getDifficultyColor = () => {
-    switch (gameSlug) {
-      case "neon-snake":
-        return "text-neon-green text-glow-green";
-      case "space-defender":
-        return "text-neon-cyan text-glow-cyan";
-      case "memory-matrix":
-        return "text-neon-violet text-glow-violet";
-      default:
-        return "text-amber-400";
-    }
-  };
 
   return (
     <div className="rounded-xl border border-white/5 bg-zinc-900/10 backdrop-blur-md p-6 space-y-6">
       <div className="flex items-center gap-2">
-        <HugeiconsIcon icon={Trophy} className={`h-5 w-5 ${getDifficultyColor()}`} />
+        <HugeiconsIcon icon={Trophy} className="h-5 w-5 text-amber-400" />
         <h3 className="text-sm font-bold uppercase tracking-widest text-white">Leaderboards</h3>
       </div>
 
