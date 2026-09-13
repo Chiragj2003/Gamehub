@@ -3,10 +3,9 @@ import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { CATALOG } from "./catalog";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase/config";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://khavodmfrdazsszqeddg.supabase.co";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_85uWdXZEhjIHStK8pCUc9Q_toXMjX-7";
-const publicSupabase = createClient(supabaseUrl, supabaseAnonKey);
+const publicSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export interface Game {
   id: number;
@@ -105,11 +104,11 @@ async function runQuery<T>(queryFn: () => Promise<T>, fallbackValue: T): Promise
 // ----------------- GRAPHQL QUERY DRIVER -----------------
 
 async function fetchGamesGraphQL(): Promise<Game[]> {
-  const res = await fetch(`${supabaseUrl}/graphql/v1`, {
+  const res = await fetch(`${SUPABASE_URL}/graphql/v1`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "apiKey": supabaseAnonKey,
+      "apiKey": SUPABASE_ANON_KEY,
     },
     body: JSON.stringify({
       query: `
@@ -150,11 +149,11 @@ async function fetchGamesGraphQL(): Promise<Game[]> {
 }
 
 async function fetchGameBySlugGraphQL(slug: string): Promise<Game | null> {
-  const res = await fetch(`${supabaseUrl}/graphql/v1`, {
+  const res = await fetch(`${SUPABASE_URL}/graphql/v1`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "apiKey": supabaseAnonKey,
+      "apiKey": SUPABASE_ANON_KEY,
     },
     body: JSON.stringify({
       query: `
