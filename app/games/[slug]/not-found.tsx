@@ -12,7 +12,7 @@ export default function GameNotFound() {
       <Navbar />
       <main className="flex-1 bg-page flex items-center justify-center py-24">
         <div className="max-w-md w-full px-4 text-center">
-          <GlassCard glowColor="violet" className="border-line p-12 space-y-6">
+          <GlassCard className="border-line p-12 space-y-6">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-surface border border-line text-danger">
               <HugeiconsIcon icon={GamepadIcon} className="h-8 w-8" />
             </div>

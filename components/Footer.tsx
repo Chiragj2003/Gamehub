@@ -5,6 +5,8 @@ const LINKS = [
   { name: "Games", href: "/" },
   { name: "Library", href: "/library" },
   { name: "Leaderboards", href: "/leaderboard" },
+  { name: "Terms", href: "/terms" },
+  { name: "Privacy", href: "/privacy" },
 ];
 
 export default function Footer() {

@@ -64,7 +64,7 @@ export default function UserMenu({ user }: UserMenuProps) {
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-neon-violet to-neon-cyan text-ink text-xs font-black">
+            <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-brand to-brand-2 text-ink-on-brand text-xs font-black">
               {getInitials()}
             </div>
           )}

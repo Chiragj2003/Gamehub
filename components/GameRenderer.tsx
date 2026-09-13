@@ -15,7 +15,7 @@ import type { GameProps } from "@/components/games/types";
 
 const Loading = () => (
   <div className="flex h-full w-full items-center justify-center bg-zinc-950">
-    <div className="h-8 w-8 animate-spin rounded-full border-2 border-neon-violet border-t-transparent" />
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand border-t-transparent" />
   </div>
 );
 
