@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon, Trophy, GamepadIcon } from "@hugeicons/core-free-icons";
-import { getGameBySlug, getGamesByCategory, getAllGames } from "@/lib/games";
+import { getGameBySlug, getGamesByCategory } from "@/lib/games";
+import { CATALOG } from "@/lib/catalog";
 import SaveGameButton from "@/components/SaveGameButton";
 import GameScreen from "@/components/GameScreen";
 import Leaderboard from "@/components/Leaderboard";
@@ -17,11 +18,14 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateStaticParams() {
-  const list = await getAllGames();
-  return list.map((g) => ({
-    slug: g.slug,
-  }));
+// Every game page is prerendered at build from the catalog and refreshed in
+// the background; a visit never waits on the database. (Play counts on the
+// page can lag by up to the revalidate window.)
+export const revalidate = 300;
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return CATALOG.map((g) => ({ slug: g.slug }));
 }
 
 export async function generateMetadata({ params }: PageProps) {
@@ -205,4 +209,3 @@ export default async function GameDetailPage({ params }: PageProps) {
     </>
   );
 }
-export const dynamic = 'force-dynamic';

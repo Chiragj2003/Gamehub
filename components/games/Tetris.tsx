@@ -352,20 +352,49 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
     }
   };
 
+  const hardDrop = (s: typeof stateRef.current) => {
+    let dropped = 0;
+    while (!collides(s, s.matrix, s.x, s.y + 1)) {
+      s.y++;
+      dropped++;
+    }
+    if (dropped > 0) s.lastWasRotate = false;
+    s.score += dropped * 2;
+    lockPiece(s);
+    s.dropTimer = 0;
+  };
+
   const input = useGameInput({
     target: canvasRef,
     queueDirections: false,
+    // Touch has its own scheme: tap rotates, swipe left/right shifts, swipe
+    // down hard-drops, swipe up holds. A touch must not count as Space, or
+    // every tap would hard-drop, and swipes must not double as arrow presses.
+    touchAsPrimary: false,
+    swipeAsPress: false,
     onPause: () => {
       const s = stateRef.current;
       if (!s.over) s.paused = !s.paused;
     },
     onTap: (x) => {
-      // Touch: tap the left or right third to shift, the middle to rotate.
+      const s = stateRef.current;
+      if (s.over) return;
+      if (s.paused) {
+        s.paused = false;
+        return;
+      }
+      // Tap the left or right quarter to shift one cell; anywhere else rotates.
+      if (x < WIDTH / 4) tryMove(s, -1);
+      else if (x > (3 * WIDTH) / 4) tryMove(s, 1);
+      else tryRotate(s, 1);
+    },
+    onSwipe: (dir) => {
       const s = stateRef.current;
       if (s.over || s.paused) return;
-      if (x < WIDTH / 3) tryMove(s, -1);
-      else if (x > (2 * WIDTH) / 3) tryMove(s, 1);
-      else tryRotate(s, 1);
+      if (dir === "left") tryMove(s, -1);
+      else if (dir === "right") tryMove(s, 1);
+      else if (dir === "down") hardDrop(s);
+      else hold(s);
     },
   });
 
@@ -439,15 +468,7 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
 
       if (io.consumePress("primary")) {
         // Hard drop: 2 points per cell, then lock immediately.
-        let dropped = 0;
-        while (!collides(s, s.matrix, s.x, s.y + 1)) {
-          s.y++;
-          dropped++;
-        }
-        if (dropped > 0) s.lastWasRotate = false;
-        s.score += dropped * 2;
-        lockPiece(s);
-        s.dropTimer = 0;
+        hardDrop(s);
         return;
       }
 

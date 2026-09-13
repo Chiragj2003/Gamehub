@@ -249,6 +249,48 @@ export const CATALOG: CatalogGame[] = [
 
 export const CATALOG_BY_SLUG = new Map(CATALOG.map((g) => [g.slug, g]));
 
+/** The shape pages and cards render; identical to a database row. */
+export interface Game {
+  id: number;
+  title: string;
+  slug: string;
+  description: string;
+  category: string;
+  difficulty: string;
+  rating: number;
+  plays: number;
+  thumbnailUrl: string | null;
+  iframeUrl: string | null;
+  controlsJson: Record<string, string>;
+  rulesJson: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const CATALOG_EPOCH = new Date("2025-01-01T00:00:00Z");
+
+/**
+ * The catalog as render-ready rows. Pages that only need to list or look up
+ * games use this directly — it is the same data the database is seeded from,
+ * ships in the bundle, and costs no request.
+ */
+export const CATALOG_GAMES: Game[] = CATALOG.map((g) => ({
+  id: g.id,
+  title: g.title,
+  slug: g.slug,
+  description: g.description,
+  category: g.category,
+  difficulty: g.difficulty,
+  rating: g.rating,
+  plays: g.plays,
+  thumbnailUrl: null,
+  iframeUrl: null,
+  controlsJson: g.controls,
+  rulesJson: g.rules,
+  createdAt: CATALOG_EPOCH,
+  updatedAt: CATALOG_EPOCH,
+}));
+
 export function getCatalogGame(slug: string): CatalogGame | undefined {
   return CATALOG_BY_SLUG.get(slug);
 }

@@ -15,7 +15,7 @@ Every game runs at the same speed on every screen, works on phones and tablets w
 
 **Pause any game with `P` or `Esc`.** Games also pause on their own if you switch tabs or the window loses focus, so a notification never costs you a run.
 
-**On a phone or tablet:** swipe to steer, tap to jump or fire, drag to move paddles. Every game works without a keyboard.
+**On a phone or tablet:** tapping Play opens the game fullscreen — turn your phone sideways for the biggest view. Swipe to steer, tap to jump or fire, drag to move paddles. Tetris: tap to rotate, swipe left/right to move, swipe down to drop, swipe up to hold. Tap a paused game to resume.
 
 ---
 
@@ -25,7 +25,7 @@ Every game runs at the same speed on every screen, works on phones and tablets w
 |------|----------|-------------------|
 | **Snake** | Arrows / WASD · swipe | Eat, grow, don't crash. Speeds up with every pellet. |
 | **Pong** | W/S or arrows · drag | First to 11 vs. the CPU, **2 Player** on one keyboard, or **Online** — create a room, share the 4-letter code. |
-| **Tetris** | ← → move · ↑/X rotate · Z rotate back · ↓ soft drop · Space hard drop · C hold · tap on touch | Full SRS rotation with wall kicks and T-spin scoring, 7-bag order, hold, lock delay, ghost, next preview. |
+| **Tetris** | ← → move · ↑/X rotate · Z rotate back · ↓ soft drop · Space hard drop · C hold · touch: tap rotate, swipe | Full SRS rotation with wall kicks and T-spin scoring, 7-bag order, hold, lock delay, ghost, next preview. |
 | **Flappy Bird** | Space / tap | Thread the gaps. Pipes speed up every five. |
 | **Breakout** | ← → / mouse / drag · Space or tap to launch | Clear the bricks. Each level adds rows and speed; top rows go two-hit from level 2. |
 | **Asteroids** | ← → turn · ↑ thrust · Space fire · hold-drag on touch | Split the rocks, survive the waves. Small rocks are fast and worth the most. |

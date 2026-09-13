@@ -84,6 +84,20 @@ export interface GameInputOptions {
   queueDirections?: boolean;
   /** Emit a direction per swipe gesture on touch devices. Default true. */
   enableSwipe?: boolean;
+  /**
+   * Whether a swipe also counts as a directional press (and queued direction)
+   * exactly like an arrow key. Default true. Games with a dedicated touch
+   * scheme set false and handle `onSwipe` themselves.
+   */
+  swipeAsPress?: boolean;
+  /**
+   * Whether touching the canvas counts as the "primary" action (Space).
+   * Default true. Set false for games where a tap must mean something else —
+   * otherwise every tap on Tetris was a hard drop.
+   */
+  touchAsPrimary?: boolean;
+  /** Touch-only: fires once per swipe gesture with its dominant direction. */
+  onSwipe?: (direction: "up" | "down" | "left" | "right") => void;
   /** Fires on a tap that was not a swipe — jump, flap, shoot. */
   onTap?: (x: number, y: number) => void;
   /** Fires when the pause action is pressed. */
@@ -99,7 +113,7 @@ export function useGameInput(options: GameInputOptions = {}) {
   const inputRef = useRef<GameInput | null>(null);
   const optionsRef = useLatest(options);
 
-  const { target, queueDirections = true, enableSwipe = true } = options;
+  const { target, queueDirections = true, enableSwipe = true, swipeAsPress = true, touchAsPrimary = true } = options;
 
   useEffect(() => {
     const held = new Set<GameAction>();
@@ -188,8 +202,10 @@ export function useGameInput(options: GameInputOptions = {}) {
       touchStartY = t.clientY;
       touchMoved = false;
       pointerPos = toCanvasCoords(t.clientX, t.clientY);
-      held.add("primary");
-      pressed.set("primary", (pressed.get("primary") ?? 0) + 1);
+      if (touchAsPrimary) {
+        held.add("primary");
+        pressed.set("primary", (pressed.get("primary") ?? 0) + 1);
+      }
     };
 
     const onTouchMove = (e: TouchEvent) => {
@@ -208,11 +224,14 @@ export function useGameInput(options: GameInputOptions = {}) {
       const action: GameAction =
         Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
 
+      touchMoved = true;
+      optionsRef.current.onSwipe?.(action as "up" | "down" | "left" | "right");
+      if (!swipeAsPress) return;
+
       held.add(action);
       pressed.set(action, (pressed.get(action) ?? 0) + 1);
       pushDirection(action);
       optionsRef.current.onAction?.(action);
-      touchMoved = true;
 
       // A swipe is a discrete gesture; drop the held state on the next frame so
       // it does not read as a key being held down forever.
@@ -281,7 +300,7 @@ export function useGameInput(options: GameInputOptions = {}) {
       }
       inputRef.current = null;
     };
-  }, [target, queueDirections, enableSwipe, optionsRef]);
+  }, [target, queueDirections, enableSwipe, swipeAsPress, touchAsPrimary, optionsRef]);
 
   return inputRef;
 }

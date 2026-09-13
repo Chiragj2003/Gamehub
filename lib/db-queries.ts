@@ -2,28 +2,13 @@ import { unstable_cache } from "next/cache";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
-import { CATALOG } from "./catalog";
+import { CATALOG_GAMES, type Game } from "./catalog";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase/config";
 import { timeoutFetch, databaseBreaker, withDeadline } from "./supabase/fetch";
 
 const publicSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { fetch: timeoutFetch } });
 
-export interface Game {
-  id: number;
-  title: string;
-  slug: string;
-  description: string;
-  category: string;
-  difficulty: string;
-  rating: number;
-  plays: number;
-  thumbnailUrl: string | null;
-  iframeUrl: string | null;
-  controlsJson: Record<string, string>;
-  rulesJson: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
+export type { Game } from "./catalog";
 
 // Helper to choose the right client depending on whether execution is client-side or server-side
 async function getSupabaseClient() {
@@ -34,24 +19,7 @@ async function getSupabaseClient() {
 }
 
 // Offline fallback so the site renders during build or a database outage.
-// Derived from the catalog, which is the single source of truth for the games.
-const CATALOG_EPOCH = new Date("2025-01-01T00:00:00Z");
-export const FALLBACK_GAMES: Game[] = CATALOG.map((g) => ({
-  id: g.id,
-  title: g.title,
-  slug: g.slug,
-  description: g.description,
-  category: g.category,
-  difficulty: g.difficulty,
-  rating: g.rating,
-  plays: g.plays,
-  thumbnailUrl: null,
-  iframeUrl: null,
-  controlsJson: g.controls,
-  rulesJson: g.rules,
-  createdAt: CATALOG_EPOCH,
-  updatedAt: CATALOG_EPOCH,
-}));
+export const FALLBACK_GAMES: Game[] = CATALOG_GAMES;
 
 
 interface DatabaseGame {

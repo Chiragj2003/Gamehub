@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
@@ -10,37 +10,26 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { type Game } from "@/db";
+import { CATALOG_GAMES } from "@/lib/catalog";
 
 function SearchResultsContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q") || "";
-  const [results, setResults] = useState<Game[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function performSearch() {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/games`);
-        if (res.ok) {
-          const allGames = await res.json() as Game[];
-          // Client-side search match to be fast and consistent
-          const filtered = allGames.filter((g: Game) =>
-            g.title.toLowerCase().includes(query.toLowerCase()) ||
-            g.description.toLowerCase().includes(query.toLowerCase()) ||
-            g.category.toLowerCase().includes(query.toLowerCase())
-          );
-          setResults(filtered);
-        }
-      } catch (e) {
-        console.warn("Failed to perform search:", e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    performSearch();
-  }, [query]);
+  const q = query.trim().toLowerCase();
+  // The catalog ships with the page; searching it needs no request.
+  const results = useMemo(
+    () =>
+      q
+        ? CATALOG_GAMES.filter(
+            (g) =>
+              g.title.toLowerCase().includes(q) ||
+              g.description.toLowerCase().includes(q) ||
+              g.category.toLowerCase().includes(q)
+          )
+        : CATALOG_GAMES,
+    [q]
+  );
+  const loading = false;
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

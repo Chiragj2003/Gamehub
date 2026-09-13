@@ -86,7 +86,7 @@ export default function ScoreSubmit({
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
       <GlassCard glowColor="cyan" className="w-full max-w-md space-y-6 border border-neon-cyan/30 p-8">
         <div className="space-y-2 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-white/5 bg-zinc-950">

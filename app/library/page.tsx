@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -10,21 +10,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useLibrary } from "@/lib/library";
-import type { Game } from "@/lib/db-queries";
+import { CATALOG_GAMES } from "@/lib/catalog";
 
 export default function LibraryPage() {
   const { ids, ready, signedIn } = useLibrary();
-  const [catalog, setCatalog] = useState<Game[] | null>(null);
 
-  useEffect(() => {
-    fetch("/api/games")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((games: Game[]) => setCatalog(games))
-      .catch(() => setCatalog([]));
-  }, []);
-
-  const loading = !ready || catalog === null;
-  const saved = catalog ? catalog.filter((g) => ids.includes(g.id)) : [];
+  const loading = !ready;
+  const saved = CATALOG_GAMES.filter((g) => ids.includes(g.id));
 
   return (
     <>
