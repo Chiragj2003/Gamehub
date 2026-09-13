@@ -33,3 +33,17 @@ export const databaseBreaker = {
 
 export const timeoutFetch: typeof fetch = (input, init) =>
   fetch(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(QUERY_TIMEOUT_MS) });
+
+/**
+ * Hard upper bound on a promise. Node cannot abort an in-flight DNS lookup,
+ * so an aborted fetch to a host that does not exist still takes as long as
+ * the resolver does; racing guarantees the caller moves on regardless. The
+ * underlying request finishes (or fails) in the background, harmlessly.
+ */
+export function withDeadline<T>(promise: Promise<T>, ms = QUERY_TIMEOUT_MS + 500): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Database request exceeded ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
+}

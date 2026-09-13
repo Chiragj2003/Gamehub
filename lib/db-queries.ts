@@ -4,7 +4,7 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { CATALOG } from "./catalog";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase/config";
-import { timeoutFetch, databaseBreaker } from "./supabase/fetch";
+import { timeoutFetch, databaseBreaker, withDeadline } from "./supabase/fetch";
 
 const publicSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { fetch: timeoutFetch } });
 
@@ -98,7 +98,7 @@ function mapGame(g: DatabaseGame): Game {
 async function runQuery<T>(queryFn: () => Promise<T>, fallbackValue: T): Promise<T> {
   if (databaseBreaker.isOpen()) return fallbackValue;
   try {
-    const result = await queryFn();
+    const result = await withDeadline(queryFn());
     databaseBreaker.reset();
     return result;
   } catch (error) {

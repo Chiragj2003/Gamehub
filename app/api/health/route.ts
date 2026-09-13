@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, isSupabaseConfigured } from "@/lib/supabase/config";
-import { timeoutFetch, databaseBreaker, QUERY_TIMEOUT_MS } from "@/lib/supabase/fetch";
+import { timeoutFetch, databaseBreaker, withDeadline, QUERY_TIMEOUT_MS } from "@/lib/supabase/fetch";
 import { rateLimitBackend } from "@/lib/rate-limit";
 import { CATALOG } from "@/lib/catalog";
 
@@ -25,9 +25,9 @@ export async function GET() {
     try {
       // Health always probes for real, bypassing the breaker, but stays bounded.
       const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { fetch: timeoutFetch } });
-      const { count, error } = await supabase
-        .from("games")
-        .select("id", { count: "exact", head: true });
+      const { count, error } = await withDeadline(
+        Promise.resolve(supabase.from("games").select("id", { count: "exact", head: true }))
+      );
       if (error) throw new Error(error.message);
       databaseBreaker.reset();
       database = { ok: true, games: count ?? 0 };
