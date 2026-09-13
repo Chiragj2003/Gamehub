@@ -65,7 +65,7 @@ export const ClassicDino: React.FC<GameProps> = ({ onGameOver }) => {
       }
 
       for (let i = 0; i < cacti.length; i++) {
-        let c = cacti[i];
+        const c = cacti[i];
         c.x -= speed;
 
         // Collision

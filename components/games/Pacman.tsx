@@ -304,8 +304,8 @@ export const ClassicPacman: React.FC<GameProps> = ({ onGameOver }) => {
 
       // animate mouth chomp
       const chompAngle = Math.abs(Math.sin(Date.now() * 0.012)) * 0.22;
-      let startAngle = chompAngle;
-      let endAngle = Math.PI * 2 - chompAngle;
+      const startAngle = chompAngle;
+      const endAngle = Math.PI * 2 - chompAngle;
       
       // align mouth direction
       const angleOffset = pDir.x > 0 ? 0 : pDir.x < 0 ? Math.PI : pDir.y > 0 ? Math.PI / 2 : pDir.y < 0 ? -Math.PI / 2 : 0;

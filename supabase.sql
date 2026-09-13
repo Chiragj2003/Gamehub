@@ -112,12 +112,37 @@ ALTER TABLE public.game_analytics ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Scores and sessions are viewable by everyone" ON public.game_analytics
   FOR SELECT USING (true);
 
--- Allow both anonymous/auth runs to log telemetry / submit scores
+-- Anonymous play is supported, so inserting a telemetry row stays open.
 CREATE POLICY "Anyone can log telemetry" ON public.game_analytics
   FOR INSERT WITH CHECK (true);
 
-CREATE POLICY "Anyone can update telemetry sessions" ON public.game_analytics
-  FOR UPDATE USING (true) WITH CHECK (true);
+-- A session row may only be completed once, and only while it is fresh.
+--
+-- The previous policy was `USING (true)`, which let any visitor holding the
+-- public anon key rewrite ANY row in this table — including other players'
+-- scores — straight from the browser, bypassing the API entirely. Restricting
+-- updates to rows that have no score yet makes a submitted score final, and the
+-- 6-hour window stops an old session id being replayed later to inject a score.
+CREATE POLICY "Sessions can be finalised once, while recent" ON public.game_analytics
+  FOR UPDATE
+  USING (
+    score IS NULL
+    AND created_at > NOW() - INTERVAL '6 hours'
+  )
+  WITH CHECK (
+    score IS NULL OR (score >= 0 AND score <= 1000000)
+  );
+
+-- Nobody may delete telemetry through the public API; leaderboard history is
+-- append-only. Administrative cleanup runs with the service role, which bypasses RLS.
+CREATE POLICY "No public deletes" ON public.game_analytics
+  FOR DELETE USING (false);
+
+-- Indexes for the leaderboard and session lookups, which are the hot paths.
+CREATE INDEX IF NOT EXISTS game_analytics_leaderboard_idx
+  ON public.game_analytics (game_id, score DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS game_analytics_session_idx
+  ON public.game_analytics (session_id);
 
 
 -- 5. Seed Games Catalog

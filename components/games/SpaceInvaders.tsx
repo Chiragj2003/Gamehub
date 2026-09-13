@@ -67,7 +67,7 @@ export const ClassicSpaceInvaders: React.FC<GameProps> = ({ onGameOver }) => {
 
     let score = 0;
     let lives = 3;
-    let keysPressed: Record<string, boolean> = {};
+    const keysPressed: Record<string, boolean> = {};
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) {

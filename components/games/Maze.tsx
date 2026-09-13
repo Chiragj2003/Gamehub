@@ -231,7 +231,7 @@ export const ClassicMaze: React.FC<GameProps> = ({ onGameOver }) => {
     setRedoStack(r => r.slice(0, -1));
   }, [mode, redoStack, path]);
 
-  const useHint = useCallback(() => {
+  const revealHint = useCallback(() => {
     if (mode === "challenge" || hintsUsed >= 3 || gameState !== "playing") return;
     const current = path[path.length - 1];
     // Find current position in solution
@@ -264,12 +264,12 @@ export const ClassicMaze: React.FC<GameProps> = ({ onGameOver }) => {
         case "Backspace": e.preventDefault(); undo(); break;
         case "z": if (e.ctrlKey) { e.preventDefault(); undo(); } break;
         case "y": if (e.ctrlKey) { e.preventDefault(); redo(); } break;
-        case "h": case "H": e.preventDefault(); useHint(); break;
+        case "h": case "H": e.preventDefault(); revealHint(); break;
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [gameState, path, moveTo, undo, redo, useHint]);
+  }, [gameState, path, moveTo, undo, redo, revealHint]);
 
   // Canvas rendering
   useEffect(() => {
@@ -475,7 +475,7 @@ export const ClassicMaze: React.FC<GameProps> = ({ onGameOver }) => {
                 className="px-2 py-1 rounded text-[10px] font-bold bg-zinc-900 text-zinc-400 border border-white/5 hover:bg-zinc-800 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
                 Redo
               </button>
-              <button onClick={useHint} disabled={hintsUsed >= 3}
+              <button onClick={revealHint} disabled={hintsUsed >= 3}
                 className="px-2 py-1 rounded text-[10px] font-bold bg-zinc-900 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/10 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
                 Hint ({3 - hintsUsed})
               </button>

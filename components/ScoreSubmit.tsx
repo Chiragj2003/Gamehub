@@ -10,8 +10,11 @@ import { saveLocalScore } from "@/lib/gameRegistry";
 interface ScoreSubmitProps {
   gameId: number;
   gameSlug: string;
+  gameTitle?: string;
   score: number;
   sessionId: string | null;
+  /** Seconds of play, sent so the server can reject impossible score rates. */
+  durationSeconds?: number;
   onClose: () => void;
   onSubmitSuccess?: () => void;
 }
@@ -19,8 +22,10 @@ interface ScoreSubmitProps {
 export default function ScoreSubmit({
   gameId,
   gameSlug,
+  gameTitle,
   score,
   sessionId,
+  durationSeconds,
   onClose,
   onSubmitSuccess
 }: ScoreSubmitProps) {
@@ -28,6 +33,7 @@ export default function ScoreSubmit({
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,40 +41,46 @@ export default function ScoreSubmit({
     if (cleanName.length < 3) return;
 
     setSubmitting(true);
+    setError(null);
     try {
-      // 1. Double save locally first in case Neon is offline
+      // Save locally first so the score survives the database being offline.
       saveLocalScore(gameSlug, cleanName, score);
       window.dispatchEvent(new Event("local-scores-updated"));
 
-      // 2. Submit to remote DB
-      await fetch("/api/games/scores", {
+      const res = await fetch("/api/games/scores", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           gameId,
           score,
           playerName: cleanName,
-          sessionId: sessionId || undefined
+          slug: gameSlug,
+          sessionId: sessionId || undefined,
+          durationSeconds
         })
       });
 
-      setSubmitted(true);
-      if (onSubmitSuccess) {
-        onSubmitSuccess();
+      if (!res.ok) {
+        // A rejection here is a validation failure, not a network problem —
+        // surface it rather than showing a success state that did not happen.
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Could not submit your score. Please try again.");
+        return;
       }
+
+      setSubmitted(true);
+      onSubmitSuccess?.();
     } catch (err) {
-      console.warn("Failed to submit score to remote API, saved locally instead:", err);
-      setSubmitted(true);
-      if (onSubmitSuccess) {
-        onSubmitSuccess();
-      }
+      console.warn("Score submission failed; the score was saved locally:", err);
+      setError("You appear to be offline. Your score was saved on this device.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleShare = () => {
-    const text = `I just scored ${score.toLocaleString()} points in ${gameSlug === "neon-snake" ? "Neon Snake" : gameSlug === "space-defender" ? "Space Defender" : "Memory Matrix"} on Game Hub! Can you beat my high score? 🚀👾`;
+    const label = gameTitle || gameSlug.replace(/-/g, " ");
+    const text = `I just scored ${score.toLocaleString()} points in ${label} on Game Hub! Can you beat my high score?`;
     try {
       navigator.clipboard.writeText(text);
       setCopied(true);
@@ -139,6 +151,15 @@ export default function ScoreSubmit({
                 disabled={submitting}
               />
             </div>
+
+            {error && (
+              <p
+                role="alert"
+                className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-center text-[11px] font-medium text-rose-300"
+              >
+                {error}
+              </p>
+            )}
 
             <div className="flex gap-3 pt-2">
               <Button

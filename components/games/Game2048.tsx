@@ -49,7 +49,7 @@ export const Classic2048: React.FC<GameProps> = ({ onGameOver }) => {
     let addedScore = 0;
     const shifted = g.map(row => {
       // Filter non-zero
-      let filtered = row.filter(val => val !== 0);
+      const filtered = row.filter(val => val !== 0);
       // Merge
       for (let i = 0; i < filtered.length - 1; i++) {
         if (filtered[i] === filtered[i + 1]) {
@@ -83,7 +83,7 @@ export const Classic2048: React.FC<GameProps> = ({ onGameOver }) => {
       e.preventDefault();
     }
     
-    let key = e.key.toLowerCase();
+    const key = e.key.toLowerCase();
     let rotated = grid.map(row => [...row]);
     let moves = 0;
 

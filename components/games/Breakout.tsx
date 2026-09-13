@@ -46,7 +46,7 @@ export const ClassicBreakout: React.FC<GameProps> = ({ onGameOver }) => {
       color: string;
     }
     const colors = ["#f43f5e", "#d946ef", "#a855f7", "#3b82f6", "#06b6d4"];
-    let bricks: Brick[][] = [];
+    const bricks: Brick[][] = [];
 
     for (let r = 0; r < brickRows; r++) {
       bricks[r] = [];
@@ -62,7 +62,7 @@ export const ClassicBreakout: React.FC<GameProps> = ({ onGameOver }) => {
 
     let score = 0;
     let lives = 3;
-    let keysPressed: Record<string, boolean> = {};
+    const keysPressed: Record<string, boolean> = {};
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) {

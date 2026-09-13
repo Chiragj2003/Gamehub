@@ -1,156 +1,224 @@
-﻿"use client";
+"use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useRef } from "react";
 import { GameProps } from "./types";
+import {
+  useGameLoop,
+  useGameInput,
+  useGameCanvas,
+  useLatest,
+  drawPauseOverlay,
+  drawGameOverFlash,
+} from "@/lib/game-engine";
+
+const WIDTH = 800;
+const HEIGHT = 600;
+const GRID = 20;
+const COLS = WIDTH / GRID;
+const ROWS = HEIGHT / GRID;
+
+/** Milliseconds per move at the start of a run, and the floor it ramps toward. */
+const START_INTERVAL = 130;
+const MIN_INTERVAL = 60;
+/** Each food eaten shaves this much off the move interval. */
+const SPEEDUP_PER_FOOD = 3;
+
+type Cell = { x: number; y: number };
+type Dir = { dx: number; dy: number };
+
+const DIRECTIONS: Record<string, Dir> = {
+  up: { dx: 0, dy: -1 },
+  down: { dx: 0, dy: 1 },
+  left: { dx: -1, dy: 0 },
+  right: { dx: 1, dy: 0 },
+};
+
+function initialState() {
+  const snake: Cell[] = [
+    { x: 8, y: 10 },
+    { x: 7, y: 10 },
+    { x: 6, y: 10 },
+  ];
+  return {
+    snake,
+    dir: { dx: 1, dy: 0 } as Dir,
+    food: { x: 14, y: 10 } as Cell,
+    score: 0,
+    moveTimer: 0,
+    interval: START_INTERVAL,
+    over: false,
+    started: false,
+    paused: false,
+    reported: false,
+  };
+}
 
 export const ClassicSnake: React.FC<GameProps> = ({ onGameOver }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { canvasRef, ctxRef } = useGameCanvas(WIDTH, HEIGHT);
+  const stateRef = useRef(initialState());
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  const onGameOverRef = useLatest(onGameOver);
 
-    let animId: number;
-    let isGameOver = false;
-    const grid = 20;
-    const w = canvas.width;
-    const h = canvas.height;
-    
-    let snake = [
-      { x: 160, y: 200 },
-      { x: 140, y: 200 },
-      { x: 120, y: 200 },
-    ];
-    let dx = grid;
-    let dy = 0;
-    let food = { x: 300, y: 200 };
-    let score = 0;
-    let lastTime = 0;
-    const speed = 100; // ms per update
-    const inputQueue: {dx: number, dy: number}[] = [];
-
-    const spawnFood = () => {
-      food.x = Math.floor(Math.random() * (w / grid)) * grid;
-      food.y = Math.floor(Math.random() * (h / grid)) * grid;
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "w", "s", "a", "d"].includes(e.key.toLowerCase())) {
-        e.preventDefault();
+  /**
+   * Pick a free cell for food.
+   *
+   * The previous version chose any random cell, so food regularly spawned
+   * underneath the snake — invisible, and eaten the instant it appeared.
+   * Collecting the empty cells first guarantees a visible, reachable target.
+   */
+  const placeFood = useCallback((snake: Cell[]): Cell => {
+    const occupied = new Set(snake.map((s) => `${s.x},${s.y}`));
+    const free: Cell[] = [];
+    for (let x = 0; x < COLS; x++) {
+      for (let y = 0; y < ROWS; y++) {
+        if (!occupied.has(`${x},${y}`)) free.push({ x, y });
       }
-      
-      const key = e.key.toLowerCase();
-      const lastInput = inputQueue.length > 0 ? inputQueue[inputQueue.length - 1] : { dx, dy };
+    }
+    if (free.length === 0) return snake[0]; // board full; the run ends next move
+    return free[Math.floor(Math.random() * free.length)];
+  }, []);
 
-      if ((key === "arrowleft" || key === "a") && lastInput.dx === 0) {
-        inputQueue.push({ dx: -grid, dy: 0 });
-      } else if ((key === "arrowright" || key === "d") && lastInput.dx === 0) {
-        inputQueue.push({ dx: grid, dy: 0 });
-      } else if ((key === "arrowup" || key === "w") && lastInput.dy === 0) {
-        inputQueue.push({ dx: 0, dy: -grid });
-      } else if ((key === "arrowdown" || key === "s") && lastInput.dy === 0) {
-        inputQueue.push({ dx: 0, dy: grid });
-      }
-    };
+  const input = useGameInput({
+    target: canvasRef,
+    queueDirections: true,
+    onPause: () => {
+      const s = stateRef.current;
+      if (!s.over && s.started) s.paused = !s.paused;
+    },
+  });
 
-    window.addEventListener("keydown", handleKeyDown);
+  /** Apply a queued turn, rejecting reversals into the snake's own neck. */
+  const turn = (s: ReturnType<typeof initialState>, action: string) => {
+    const next = DIRECTIONS[action];
+    if (!next) return;
+    if (next.dx === -s.dir.dx && next.dy === -s.dir.dy) return;
+    s.dir = next;
+  };
 
-    const triggerGameOver = () => {
-      isGameOver = true;
-      cancelAnimationFrame(animId);
-      ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
-      ctx.fillRect(0, 0, w, h);
-      setTimeout(() => onGameOver(score), 1500);
-    };
+  useGameLoop({
+    step: 1000 / 60,
 
-    const update = (time: number) => {
-      if (!isGameOver) animId = requestAnimationFrame(update);
-      if (time - lastTime < speed) return;
-      lastTime = time;
+    update: (dt) => {
+      const s = stateRef.current;
+      const io = input.current;
+      if (!io || s.over) return;
 
-      if (inputQueue.length > 0) {
-        const nextInput = inputQueue.shift()!;
-        dx = nextInput.dx;
-        dy = nextInput.dy;
-      }
-
-      // Move head
-      const head = { x: snake[0].x + dx, y: snake[0].y + dy };
-
-      // Wall collision
-      if (head.x < 0 || head.x >= w || head.y < 0 || head.y >= h) {
-        triggerGameOver();
+      if (!s.started) {
+        // Any directional input starts the run, so the snake does not crawl
+        // into a wall while the player is still reading the controls.
+        const first = io.shiftDirection();
+        if (first) {
+          s.started = true;
+          turn(s, first);
+        } else if (io.consumePress("primary")) {
+          s.started = true;
+        }
         return;
       }
 
-      // Self collision
-      for (let i = 0; i < snake.length; i++) {
-        if (snake[i].x === head.x && snake[i].y === head.y) {
-          triggerGameOver();
-          return;
-        }
+      if (s.paused) return;
+
+      s.moveTimer += dt * 1000;
+      if (s.moveTimer < s.interval) return;
+      s.moveTimer -= s.interval;
+
+      // One buffered turn per move: a fast up-then-left input registers both
+      // turns in order instead of the first being overwritten.
+      const queued = io.shiftDirection();
+      if (queued) turn(s, queued);
+
+      const head = { x: s.snake[0].x + s.dir.dx, y: s.snake[0].y + s.dir.dy };
+
+      if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+        s.over = true;
+        return;
       }
 
-      snake.unshift(head);
+      // The tail cell frees up on this same move, so entering it is legal —
+      // only the rest of the body is a fatal collision.
+      const body = s.snake.slice(0, -1);
+      if (body.some((c) => c.x === head.x && c.y === head.y)) {
+        s.over = true;
+        return;
+      }
 
-      // Eat food
-      if (head.x === food.x && head.y === food.y) {
-        score += 10;
-        spawnFood();
+      s.snake.unshift(head);
+
+      if (head.x === s.food.x && head.y === s.food.y) {
+        s.score += 10;
+        s.interval = Math.max(MIN_INTERVAL, s.interval - SPEEDUP_PER_FOOD);
+        s.food = placeFood(s.snake);
       } else {
-        snake.pop();
+        s.snake.pop();
       }
 
-      // Draw
-      ctx.fillStyle = "#09090b";
-      ctx.fillRect(0, 0, w, h);
+      if (s.over && !s.reported) {
+        s.reported = true;
+        const final = s.score;
+        setTimeout(() => onGameOverRef.current(final), 1200);
+      }
+    },
 
-      // Neon grid lines
+    render: () => {
+      const ctx = ctxRef.current;
+      if (!ctx) return;
+      const s = stateRef.current;
+
+      ctx.fillStyle = "#09090b";
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
       ctx.strokeStyle = "rgba(255,255,255,0.02)";
       ctx.lineWidth = 1;
-      for (let x = 0; x < w; x += grid) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, h);
-        ctx.stroke();
+      ctx.beginPath();
+      for (let x = 0; x <= COLS; x++) {
+        ctx.moveTo(x * GRID, 0);
+        ctx.lineTo(x * GRID, HEIGHT);
       }
-      for (let y = 0; y < h; y += grid) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
+      for (let y = 0; y <= ROWS; y++) {
+        ctx.moveTo(0, y * GRID);
+        ctx.lineTo(WIDTH, y * GRID);
       }
+      ctx.stroke();
 
-      // Draw food (Neon Red Capsule)
-      ctx.save();
-      
-      
       ctx.fillStyle = "#ef4444";
       ctx.beginPath();
-      ctx.arc(food.x + grid / 2, food.y + grid / 2, grid / 2 - 2, 0, Math.PI * 2);
+      ctx.arc(
+        s.food.x * GRID + GRID / 2,
+        s.food.y * GRID + GRID / 2,
+        GRID / 2 - 2,
+        0,
+        Math.PI * 2
+      );
       ctx.fill();
-      ctx.restore();
 
-      // Draw snake (Neon Green capsules)
-      snake.forEach((part, index) => {
-        ctx.save();
-        ctx.shadowColor = index === 0 ? "#10b981" : "#059669";
-        
-        ctx.fillStyle = index === 0 ? "#10b981" : "#047857";
-        ctx.fillRect(part.x + 1, part.y + 1, grid - 2, grid - 2);
-        ctx.restore();
-      });
-    };
+      for (let i = 0; i < s.snake.length; i++) {
+        const part = s.snake[i];
+        ctx.fillStyle = i === 0 ? "#10b981" : "#047857";
+        ctx.fillRect(part.x * GRID + 1, part.y * GRID + 1, GRID - 2, GRID - 2);
+      }
 
-    if (!isGameOver) animId = requestAnimationFrame(update);
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = "bold 20px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(String(s.score), 16, 32);
 
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      cancelAnimationFrame(animId);
-    };
-  }, [onGameOver]);
+      if (!s.started) {
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.font = "bold 22px system-ui, sans-serif";
+        ctx.fillText("Arrow keys, WASD, or swipe to start", WIDTH / 2, HEIGHT / 2);
+      }
 
-  return <canvas ref={canvasRef} width={800} height={600} className="w-full h-full block bg-zinc-950" />;
+      if (s.paused) drawPauseOverlay(ctx, WIDTH, HEIGHT);
+      if (s.over) drawGameOverFlash(ctx, WIDTH, HEIGHT);
+    },
+  });
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="block h-full w-full touch-none bg-zinc-950"
+      aria-label="Snake game"
+    />
+  );
 };

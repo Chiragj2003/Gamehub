@@ -19,9 +19,10 @@ import MemoryMatrixScene from "@/game/scenes/MemoryMatrixScene";
 interface GameConsoleProps {
   gameId: number;
   gameSlug: string;
+  gameTitle?: string;
 }
 
-export default function GameConsoleImpl({ gameId, gameSlug }: GameConsoleProps) {
+export default function GameConsoleImpl({ gameId, gameSlug, gameTitle }: GameConsoleProps) {
   const router = useRouter();
   const gameContainerId = `phaser-game-container-${gameSlug}`;
   
@@ -29,6 +30,8 @@ export default function GameConsoleImpl({ gameId, gameSlug }: GameConsoleProps) 
   const [loading, setLoading] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [score, setScore] = useState(0);
+  // Snapshot of play time taken when the run ends, for score validation.
+  const [finalDuration, setFinalDuration] = useState(0);
   const [lives, setLives] = useState(3);
   const [hudMsg, setHudMsg] = useState("");
   const [showScoreModal, setShowScoreModal] = useState(false);
@@ -166,6 +169,7 @@ export default function GameConsoleImpl({ gameId, gameSlug }: GameConsoleProps) 
   // Trigger game over, stop session
   const triggerGameOver = () => {
     stopPlaySession(true);
+    setFinalDuration(Math.floor((Date.now() - sessionStartRef.current) / 1000));
     setShowScoreModal(true);
   };
 
@@ -348,8 +352,10 @@ export default function GameConsoleImpl({ gameId, gameSlug }: GameConsoleProps) 
         <ScoreSubmit
           gameId={gameId}
           gameSlug={gameSlug}
+          gameTitle={gameTitle}
           score={score}
           sessionId={sessionId}
+          durationSeconds={finalDuration}
           onClose={() => {
             setShowScoreModal(false);
             handleRestart();

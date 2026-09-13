@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { queryLeaderboard, insertSessionScore, updateSessionScoreAndPlayer } from "@/lib/games";
+import { validateScore, checkRateLimit, getClientKey } from "@/lib/score-validation";
 
 export async function GET(request: Request) {
   try {
@@ -12,8 +13,11 @@ export async function GET(request: Request) {
     }
 
     const gameId = parseInt(gameIdStr, 10);
-    const topScores = await queryLeaderboard(gameId, slug);
+    if (!Number.isInteger(gameId) || gameId <= 0) {
+      return NextResponse.json({ error: "Invalid gameId parameter" }, { status: 400 });
+    }
 
+    const topScores = await queryLeaderboard(gameId, slug);
     return NextResponse.json(topScores);
   } catch (error) {
     console.error("API GET scores error:", error);
@@ -23,21 +27,40 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { gameId, score, playerName, sessionId } = body;
-
-    if (!gameId || score === undefined || !playerName) {
-      return NextResponse.json({ error: "Missing required fields (gameId, score, playerName)" }, { status: 400 });
+    const limit = checkRateLimit(getClientKey(request));
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Too many score submissions. Please wait before trying again." },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+      );
     }
 
-    // Try to update existing session analytics score first, or insert new score
+    const body = await request.json();
+    const { gameId, score, playerName, slug, sessionId, durationSeconds } = body ?? {};
+
+    const result = validateScore({
+      gameId,
+      score,
+      playerName,
+      slug,
+      sessionId,
+      durationSeconds,
+    });
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.reason }, { status: 400 });
+    }
+
+    // Prefer updating the analytics row created when the run started: that row
+    // already carries a server-recorded duration, so a score attached to it is
+    // tied to a real session rather than invented by the caller.
     let success = false;
     if (sessionId) {
-      success = await updateSessionScoreAndPlayer(sessionId, score, playerName);
+      success = await updateSessionScoreAndPlayer(sessionId, result.score, result.playerName);
     }
-    
+
     if (!success) {
-      success = await insertSessionScore(gameId, score, playerName, sessionId);
+      success = await insertSessionScore(gameId, result.score, result.playerName, sessionId);
     }
 
     return NextResponse.json({ success });
@@ -46,4 +69,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to submit score" }, { status: 500 });
   }
 }
-export const dynamic = 'force-dynamic';
+
+export const dynamic = "force-dynamic";

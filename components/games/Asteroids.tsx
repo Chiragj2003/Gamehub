@@ -35,7 +35,7 @@ export const ClassicAsteroids: React.FC<GameProps> = ({ onGameOver }) => {
       sides: number;
       offsets: number[];
     }
-    let asteroids: Asteroid[] = [];
+    const asteroids: Asteroid[] = [];
 
     const makeAsteroid = (x: number, y: number, r: number) => {
       const sides = Math.floor(Math.random() * 5) + 8;
@@ -69,7 +69,7 @@ export const ClassicAsteroids: React.FC<GameProps> = ({ onGameOver }) => {
 
     let score = 0;
     let lives = 3;
-    let keysPressed: Record<string, boolean> = {};
+    const keysPressed: Record<string, boolean> = {};
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {

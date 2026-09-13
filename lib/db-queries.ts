@@ -45,7 +45,7 @@ export const FALLBACK_GAMES: Game[] = [
     plays: 14820,
     thumbnailUrl: "",
     iframeUrl: "/games/snake/embed",
-    controlsJson: { movement: "Arrow Keys / WASD", pause: "P key", restart: "R key" },
+    controlsJson: { movement: "Arrow Keys / WASD", "touch": "Swipe to turn", pause: "P or Esc" },
     rulesJson: [
       "Navigate the snake to eat glowing red food pellets.",
       "Each food pellet increases your length and speeds up the game.",
@@ -65,7 +65,7 @@ export const FALLBACK_GAMES: Game[] = [
     plays: 8900,
     thumbnailUrl: "",
     iframeUrl: "/games/pong/embed",
-    controlsJson: { "player 1 (Left)": "W / S keys", "player 2 (Right)": "Arrow Up / Down keys", pause: "P key" },
+    controlsJson: { "vs CPU": "Arrow Keys or W / S", "2 player (Left)": "W / S keys", "2 player (Right)": "Arrow Up / Down, or drag on touch", pause: "P or Esc" },
     rulesJson: [
       "Bounce the ball back and forth using your paddles.",
       "Score a point when the ball passes the opponent's screen edge.",
@@ -85,7 +85,7 @@ export const FALLBACK_GAMES: Game[] = [
     plays: 23150,
     thumbnailUrl: "",
     iframeUrl: "/games/tetris/embed",
-    controlsJson: { move: "Left / Right Arrows", rotate: "Up Arrow / X key", "soft drop": "Down Arrow", "hard drop": "Spacebar", hold: "C key / Shift" },
+    controlsJson: { move: "Left / Right Arrows (hold to auto-shift)", rotate: "Up Arrow", "soft drop": "Down Arrow", "hard drop": "Spacebar", touch: "Tap left / right thirds to move, middle to rotate", pause: "P or Esc" },
     rulesJson: [
       "Arrange falling puzzle blocks to form complete horizontal lines.",
       "Completed lines are cleared and award score multipliers.",

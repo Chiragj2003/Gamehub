@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useLatest } from "@/lib/game-engine";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PlayIcon, GamepadIcon, TimerIcon } from "@hugeicons/core-free-icons";
 import { startGameSession, endAndTrackSession } from "@/lib/analytics";
@@ -22,6 +23,12 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
   const [timer, setTimer] = useState(0);
   const [score, setScore] = useState(0);
   const [showScoreModal, setShowScoreModal] = useState(false);
+  // Captured when the run ends, since the live timer keeps counting afterwards.
+  const [finalDuration, setFinalDuration] = useState(0);
+
+  // The postMessage handler closes over state, so mirror the timer in a ref to
+  // read its current value without re-subscribing every second.
+  const timerRef = useLatest(timer);
 
   useEffect(() => {
     setMounted(true);
@@ -57,6 +64,7 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
       if (event.data && event.data.type === "game-over") {
         const finalScore = Number(event.data.score) || 0;
         setScore(finalScore);
+        setFinalDuration(timerRef.current);
         if (sessionId) {
           endAndTrackSession(sessionId, true, finalScore).catch(err =>
             console.warn("Failed to end telemetry session:", err)
@@ -69,7 +77,7 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [sessionId]);
+  }, [sessionId, timerRef]);
 
   const handlePlay = () => {
     const sId = startGameSession(gameId);
@@ -168,8 +176,10 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
         <ScoreSubmit
           gameId={gameId}
           gameSlug={gameSlug}
+          gameTitle={gameTitle}
           score={score}
           sessionId={sessionId}
+          durationSeconds={finalDuration}
           onClose={() => {
             setShowScoreModal(false);
             setIsPlaying(false);
