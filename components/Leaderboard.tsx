@@ -62,24 +62,25 @@ export default function Leaderboard({ gameId, gameSlug }: LeaderboardProps) {
   const formatDate = (value: string) =>
     new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
+  // Gold, silver, bronze as soft tints; the rest sit quietly on glass.
   const rankStyle = (rank: number) =>
     ({
-      1: "text-amber-400 font-extrabold border-amber-500/20 bg-amber-500/5",
-      2: "text-zinc-300 font-bold border-zinc-500/20 bg-zinc-500/5",
-      3: "text-amber-700 font-bold border-amber-800/20 bg-amber-800/5",
-    })[rank] ?? "text-zinc-400 border-white/3 bg-zinc-950/20";
+      1: "font-extrabold text-diff-medium border-diff-medium/25 bg-diff-medium/10",
+      2: "font-bold text-ink border-line-strong bg-muted",
+      3: "font-bold text-cat-retro border-cat-retro/20 bg-cat-retro/5",
+    })[rank] ?? "text-ink-2 border-line";
 
   const personalBest = local[0];
 
   return (
-    <div className="space-y-6 rounded-xl border border-white/5 bg-zinc-900/10 p-6 backdrop-blur-md">
+    <div className="glass space-y-6 rounded-3xl p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <HugeiconsIcon icon={Trophy} className="h-5 w-5 text-amber-400" />
-          <h3 className="text-sm font-bold uppercase tracking-widest text-white">Leaderboard</h3>
+          <HugeiconsIcon icon={Trophy} className="h-5 w-5 text-diff-medium" />
+          <h3 className="text-[15px] font-bold text-ink">Leaderboard</h3>
         </div>
         {status === "offline" && (
-          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">Offline</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-danger">Offline</span>
         )}
       </div>
 
@@ -94,15 +95,13 @@ export default function Leaderboard({ gameId, gameSlug }: LeaderboardProps) {
         </div>
       ) : status === "offline" ? (
         <div className="py-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Couldn&apos;t reach the leaderboard
-          </p>
-          <p className="mt-1 text-[10px] text-zinc-600">Your scores are still saved on this device.</p>
+          <p className="text-[14px] font-medium text-ink">Couldn&apos;t reach the leaderboard</p>
+          <p className="mt-1 text-[12px] text-ink-3">Your scores are still saved on this device.</p>
         </div>
       ) : scores.length === 0 ? (
         <div className="py-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">No scores yet</p>
-          <p className="mt-1 text-[10px] text-zinc-600">Be the first on the board.</p>
+          <p className="text-[14px] font-medium text-ink">No scores yet</p>
+          <p className="mt-1 text-[12px] text-ink-3">Be the first on the board.</p>
         </div>
       ) : (
         <ol className="space-y-2.5">
@@ -111,17 +110,17 @@ export default function Leaderboard({ gameId, gameSlug }: LeaderboardProps) {
             return (
               <li
                 key={`${entry.playerName}-${entry.createdAt}-${idx}`}
-                className={`flex items-center justify-between rounded-lg border p-2 text-xs transition-all hover:bg-zinc-950/40 ${rankStyle(rank)}`}
+                className={`flex items-center justify-between rounded-2xl border px-3 py-2 text-[13px] transition-colors duration-150 hover:bg-muted ${rankStyle(rank)}`}
               >
                 <div className="flex items-center gap-2.5">
                   <span className="w-5 text-center font-bold">#{rank}</span>
                   <span className="font-mono font-semibold tracking-wider">{entry.playerName}</span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-right font-mono font-black text-white">
+                  <span className="text-right font-mono font-black text-ink">
                     {entry.score.toLocaleString()}
                   </span>
-                  <span className="flex items-center gap-0.5 text-[10px] text-zinc-500">
+                  <span className="flex items-center gap-0.5 text-[10px] text-ink-2">
                     <HugeiconsIcon icon={CalendarIcon} className="h-3 w-3 shrink-0" />
                     {formatDate(entry.createdAt)}
                   </span>
@@ -133,14 +132,14 @@ export default function Leaderboard({ gameId, gameSlug }: LeaderboardProps) {
       )}
 
       {personalBest && (
-        <div className="border-t border-white/5 pt-4">
+        <div className="border-t border-line pt-4">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3">
               Your best on this device
             </span>
             <span className="flex items-center gap-2">
-              <span className="font-mono font-semibold text-zinc-300">{personalBest.playerName}</span>
-              <span className="font-mono font-black text-white">{personalBest.score.toLocaleString()}</span>
+              <span className="font-mono font-semibold text-ink">{personalBest.playerName}</span>
+              <span className="font-mono font-black text-ink">{personalBest.score.toLocaleString()}</span>
             </span>
           </div>
         </div>

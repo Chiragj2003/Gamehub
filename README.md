@@ -15,6 +15,8 @@ Every game runs at the same speed on every screen, works on phones and tablets w
 
 **Pause any game with `P` or `Esc`.** Games also pause on their own if you switch tabs or the window loses focus, so a notification never costs you a run.
 
+**Light or dark:** the sun/moon in the header switches themes and remembers your choice; with no choice made, the site follows your system. Press `⌘K` / `Ctrl+K` anywhere to search.
+
 **On a phone or tablet:** tapping Play opens the game fullscreen — turn your phone sideways for the biggest view. Swipe to steer, tap to jump or fire, drag to move paddles. Tetris: tap to rotate, swipe left/right to move, swipe down to drop, swipe up to hold. Tap a paused game to resume.
 
 ---
@@ -49,6 +51,8 @@ Every game runs at the same speed on every screen, works on phones and tablets w
 Only read on if you want to run or modify the code.
 
 **Stack:** Next.js 16 (App Router), React 19, TypeScript, Tailwind v4, Supabase (Postgres + Auth). Every game is hand-written `<canvas>` (2048 is DOM) on a small shared engine — no game framework.
+
+**Design system:** every colour is a CSS custom property in [`app/globals.css`](app/globals.css) (`--bg`, `--surface`, `--ink`, `--brand`, per-category and per-difficulty accents), with light as the base and `[data-theme="dark"]` overriding. Tailwind utilities read them (`bg-page`, `text-ink`, `border-line`, `text-cat-arcade`…). Glass surfaces are the `.glass`, `.glass-strong`, `.glass-card` utilities; CTAs are `.btn-glow` / `.btn-quiet`. The game canvases are deliberately dark in both themes. The theme is set before first paint by an inline script (`lib/theme.ts`).
 
 ```bash
 npm install

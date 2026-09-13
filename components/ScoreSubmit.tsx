@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { SparklesIcon, CheckmarkCircle01Icon, Share01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
-import { GlassCard } from "@/components/ui/GlassCard";
 import { saveLocalScore } from "@/lib/localScores";
 
 interface ScoreSubmitProps {
@@ -87,17 +86,16 @@ export default function ScoreSubmit({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-      <GlassCard glowColor="cyan" className="w-full max-w-md space-y-6 border border-neon-cyan/30 p-8">
+      <div className="glass-strong w-full max-w-md space-y-6 rounded-3xl p-8">
         <div className="space-y-2 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-white/5 bg-zinc-950">
-            <HugeiconsIcon icon={SparklesIcon} className="h-6 w-6 text-neon-cyan" />
+          <div className="glass mx-auto flex h-12 w-12 items-center justify-center rounded-2xl text-brand">
+            <HugeiconsIcon icon={SparklesIcon} className="h-6 w-6" />
           </div>
-          <h2 className="text-2xl font-black uppercase tracking-tight text-white">
-            {submitted ? "On the board" : "Game Over"}
+          <h2 className="text-[26px] font-black tracking-[-0.03em] text-ink">
+            {submitted ? "On the board" : "Game over"}
           </h2>
-          <p className="text-xs text-zinc-400">
-            You scored{" "}
-            <span className="font-black text-neon-cyan">{score.toLocaleString()}</span> points.
+          <p className="text-[14px] text-ink-2">
+            You scored <span className="font-mono font-bold text-ink">{score.toLocaleString()}</span> points.
           </p>
         </div>
 
@@ -106,7 +104,7 @@ export default function ScoreSubmit({
             <div className="space-y-1.5">
               <label
                 htmlFor="initials"
-                className="text-[10px] font-bold uppercase tracking-wider text-zinc-500"
+                className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3"
               >
                 Enter initials (3 letters)
               </label>
@@ -119,7 +117,7 @@ export default function ScoreSubmit({
                 placeholder="AAA"
                 autoFocus
                 required
-                className="h-11 w-full rounded-lg border border-white/10 bg-zinc-950 px-4 text-center font-mono text-lg font-bold uppercase tracking-widest text-white transition-all focus:border-neon-cyan/50 focus:outline-none focus:ring-1 focus:ring-neon-cyan/20"
+                className="h-12 w-full rounded-2xl border border-line bg-muted px-4 text-center font-mono text-xl font-bold uppercase tracking-[0.3em] text-ink transition-all focus:border-brand focus:outline-none"
                 disabled={submitting}
               />
             </div>
@@ -127,7 +125,7 @@ export default function ScoreSubmit({
             {error && (
               <p
                 role="alert"
-                className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-center text-[11px] font-medium text-rose-300"
+                className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-center text-[12px] font-medium text-danger"
               >
                 {error}
               </p>
@@ -138,14 +136,14 @@ export default function ScoreSubmit({
                 type="button"
                 variant="ghost"
                 onClick={onClose}
-                className="h-10 flex-1 text-xs font-bold uppercase tracking-wider text-zinc-500 hover:text-white"
+                className="btn-quiet h-11 flex-1 rounded-full text-[14px] font-semibold text-ink-2 hover:text-ink"
                 disabled={submitting}
               >
                 Skip
               </Button>
               <Button
                 type="submit"
-                className="h-10 flex-1 rounded-full bg-primary text-xs font-bold uppercase tracking-wider text-primary-foreground transition-all hover:bg-neon-cyan"
+                className="btn-glow h-11 flex-1 rounded-full text-[14px] font-semibold"
                 disabled={name.trim().length < 3 || submitting}
               >
                 {submitting ? "Submitting…" : "Submit score"}
@@ -154,16 +152,16 @@ export default function ScoreSubmit({
           </form>
         ) : (
           <div className="space-y-4 text-center">
-            <div className="flex flex-col items-center justify-center gap-2 py-2 text-emerald-400">
+            <div className="flex flex-col items-center justify-center gap-2 py-2 text-success">
               <HugeiconsIcon icon={CheckmarkCircle01Icon} className="h-10 w-10" />
-              <span className="text-xs font-bold uppercase tracking-widest">Added to the leaderboard</span>
+              <span className="text-[12px] font-semibold uppercase tracking-[0.1em]">Added to the leaderboard</span>
             </div>
 
             <div className="flex gap-3 pt-2">
               <Button
                 onClick={handleShare}
                 variant="outline"
-                className="flex h-10 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full border-white/15 text-xs font-bold uppercase tracking-wider text-white hover:bg-white/5"
+                className="btn-quiet flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full text-[14px] font-semibold"
               >
                 <HugeiconsIcon icon={Share01Icon} className="h-4 w-4" />
                 {copied ? "Copied" : "Share"}
@@ -171,7 +169,7 @@ export default function ScoreSubmit({
               {onPlayAgain && (
                 <Button
                   onClick={onPlayAgain}
-                  className="h-10 flex-1 cursor-pointer rounded-full bg-primary text-xs font-bold uppercase tracking-wider text-primary-foreground transition-all hover:bg-neon-violet"
+                  className="btn-glow h-11 flex-1 cursor-pointer rounded-full text-[14px] font-semibold"
                 >
                   Play again
                 </Button>
@@ -179,13 +177,13 @@ export default function ScoreSubmit({
             </div>
             <button
               onClick={onClose}
-              className="cursor-pointer text-[11px] font-semibold text-zinc-500 transition-colors hover:text-white"
+              className="cursor-pointer text-[13px] font-medium text-ink-2 transition-colors hover:text-ink"
             >
               Done
             </button>
           </div>
         )}
-      </GlassCard>
+      </div>
     </div>
   );
 }

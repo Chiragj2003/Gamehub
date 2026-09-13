@@ -1,72 +1,57 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Search01Icon, Menu01Icon, UserCircleIcon } from "@hugeicons/core-free-icons";
-import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader, SheetDescription } from "@/components/ui/sheet";
-import SearchBar from "@/components/SearchBar";
-
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import AuthModal from "@/components/AuthModal";
 import UserMenu from "@/components/UserMenu";
+import ThemeToggle from "@/components/ThemeToggle";
+import SearchOverlay from "@/components/SearchOverlay";
 
+const NAV = [
+  { name: "Games", href: "/" },
+  { name: "Library", href: "/library" },
+  { name: "Leaderboards", href: "/leaderboard" },
+];
 
 export default function Navbar() {
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null));
+    return () => sub.subscription.unsubscribe();
   }, []);
 
-
-  const navItems = [
-    { name: "Games", href: "/" },
-    { name: "Library", href: "/library" },
-    { name: "Leaderboards", href: "/leaderboard" },
-  ];
-
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-14 items-center justify-between gap-4">
-          
-          {/* Logo — text only, clean */}
-          <Link href="/" className="flex items-center gap-1.5 group">
-            <span className="text-lg font-black tracking-tight text-white">
-              Game<span className="text-primary">Hub</span>
-            </span>
+    <>
+      {/* Fixed so content scrolls beneath and is frosted; the spacer keeps layout honest. */}
+      <header className="glass fixed inset-x-0 top-0 z-50 border-x-0 border-t-0">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="pressable flex items-center rounded-lg text-[19px] font-black tracking-[-0.03em] text-ink">
+            Game<span className="text-brand">Hub</span>
           </Link>
 
-          {/* Desktop Navigation — no icons, just text */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
+          <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
+            {NAV.map((item) => {
+              const active = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`px-3.5 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                    isActive
-                      ? "text-white bg-white/8"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  aria-current={active ? "page" : undefined}
+                  className={`pressable rounded-full px-4 py-2 text-[14px] font-medium transition-colors duration-200 ${
+                    active ? "bg-muted text-ink" : "text-ink-2 hover:bg-muted hover:text-ink"
                   }`}
                 >
                   {item.name}
@@ -75,90 +60,94 @@ export default function Navbar() {
             })}
           </nav>
 
-          {/* Actions */}
           <div className="flex items-center gap-2">
-            
-            {/* Search */}
-            <div className="hidden sm:block">
-              <Suspense fallback={<div className="w-44 h-8 bg-zinc-900/30 rounded-lg animate-pulse" />}>
-                <SearchBar className="w-44 xl:w-56" />
-              </Suspense>
-            </div>
-
-            {/* Mobile Search */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="sm:hidden text-zinc-400 hover:text-white h-8 w-8"
-              onClick={() => setSearchOpen(!searchOpen)}
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search games"
+              className="btn-quiet flex h-9 cursor-pointer items-center gap-2 rounded-full px-3 text-ink-2 hover:text-ink sm:pr-2"
             >
               <HugeiconsIcon icon={Search01Icon} className="h-4 w-4" />
-            </Button>
+              <span className="hidden text-[13px] sm:inline">Search</span>
+              <kbd className="hidden rounded-md border border-line px-1.5 py-0.5 font-mono text-[10px] text-ink-3 lg:inline">⌘K</kbd>
+            </button>
 
-            {/* Profile */}
+            <ThemeToggle />
+
             {user ? (
               <UserMenu user={user} />
             ) : (
-              <Button
-                variant="ghost"
-                size="icon"
+              <button
+                type="button"
                 onClick={() => setAuthOpen(true)}
-                className="h-8 w-8 rounded-full border border-white/5 hover:border-white/15 transition-colors cursor-pointer"
+                aria-label="Sign in"
+                className="btn-quiet flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-ink-2 hover:text-ink"
               >
-                <HugeiconsIcon icon={UserCircleIcon} className="h-4 w-4 text-zinc-400" />
-              </Button>
+                <HugeiconsIcon icon={UserCircleIcon} className="h-4 w-4" />
+              </button>
             )}
 
-            <AuthModal isOpen={authOpen} onOpenChange={setAuthOpen} />
-
-            {/* Mobile Nav */}
-            <Sheet>
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden text-zinc-400 hover:text-white h-8 w-8">
+                <button
+                  type="button"
+                  aria-label="Open menu"
+                  className="btn-quiet flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-ink-2 hover:text-ink md:hidden"
+                >
                   <HugeiconsIcon icon={Menu01Icon} className="h-5 w-5" />
-                </Button>
+                </button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-72 border-l border-white/5 bg-background p-6">
-                <SheetHeader className="text-left pb-4 border-b border-white/5">
-                  <SheetTitle className="text-lg font-black tracking-tight">
-                    Game<span className="text-primary">Hub</span>
+              <SheetContent side="right" className="glass-strong w-[86vw] max-w-sm border-y-0 border-r-0 p-0 text-ink">
+                <SheetHeader className="border-b border-line px-6 pb-5 pt-6 text-left">
+                  <SheetTitle className="text-[22px] font-black tracking-[-0.03em] text-ink">
+                    Game<span className="text-brand">Hub</span>
                   </SheetTitle>
-                  <SheetDescription className="text-zinc-500 text-xs">
-                    Classic games, reimagined.
+                  <SheetDescription className="text-[13px] text-ink-2">
+                    Ten classic games. No downloads.
                   </SheetDescription>
                 </SheetHeader>
-                <div className="mt-6 flex flex-col gap-1">
-                  {navItems.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-300 hover:bg-white/5 hover:text-white transition-all"
-                    >
-                      {item.name}
-                    </Link>
-                  ))}
-                </div>
-                <div className="absolute bottom-6 left-6 right-6 pt-4 border-t border-white/5">
-                  <p className="text-center text-[10px] text-zinc-600">
-                    &copy; 2026 Game Hub
-                  </p>
+                <nav className="flex flex-col gap-1 p-3" aria-label="Menu">
+                  {NAV.map((item) => {
+                    const active = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMenuOpen(false)}
+                        aria-current={active ? "page" : undefined}
+                        className={`pressable rounded-2xl px-4 py-3.5 text-[16px] font-semibold transition-colors ${
+                          active ? "bg-muted text-ink" : "text-ink-2 hover:bg-muted hover:text-ink"
+                        }`}
+                      >
+                        {item.name}
+                      </Link>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setSearchOpen(true);
+                    }}
+                    className="pressable flex cursor-pointer items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-[16px] font-semibold text-ink-2 transition-colors hover:bg-muted hover:text-ink"
+                  >
+                    <HugeiconsIcon icon={Search01Icon} className="h-4 w-4" />
+                    Search games
+                  </button>
+                </nav>
+                <div className="mt-auto flex items-center justify-between border-t border-line px-6 py-4">
+                  <span className="text-[12px] text-ink-3">Appearance</span>
+                  <ThemeToggle />
                 </div>
               </SheetContent>
             </Sheet>
-
           </div>
         </div>
+      </header>
+      <div className="h-16" aria-hidden="true" />
 
-        {/* Mobile Search Expansion */}
-        {searchOpen && (
-          <div className="sm:hidden border-t border-white/5 py-2.5 px-1">
-            <Suspense fallback={<div className="w-full h-8 bg-zinc-900/30 rounded-lg animate-pulse" />}>
-              <SearchBar placeholder="Search games..." />
-            </Suspense>
-          </div>
-        )}
-
-      </div>
-    </header>
+      <AuthModal isOpen={authOpen} onOpenChange={setAuthOpen} />
+      <SearchOverlay open={searchOpen} onOpenChange={setSearchOpen} />
+    </>
   );
 }

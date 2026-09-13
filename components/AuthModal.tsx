@@ -86,12 +86,12 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="border-white/5 bg-zinc-950/95 backdrop-blur-xl p-8 max-w-md rounded-2xl shadow-2xl">
+      <DialogContent className="border-line bg-surface p-8 max-w-md rounded-2xl shadow-2xl">
         <DialogHeader className="text-center space-y-2 pb-2">
-          <DialogTitle className="text-2xl font-black uppercase tracking-tight text-white">
+          <DialogTitle className="text-2xl font-black tracking-[-0.02em] text-ink">
             {isSignUp ? "Create Account" : "Access Game Hub"}
           </DialogTitle>
-          <DialogDescription className="text-zinc-500 text-xs">
+          <DialogDescription className="text-ink-2 text-xs">
             {isSignUp 
               ? "Join the club to bookmark games, save high scores, and access leaderboards."
               : "Sign in to resume library saves, check premium perks, and record runs."
@@ -100,7 +100,7 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
         </DialogHeader>
 
         {error && (
-          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs py-3 px-4 rounded-lg text-center font-semibold">
+          <div className="bg-danger/10 border border-danger/20 text-danger text-xs py-3 px-4 rounded-xl text-center font-semibold">
             {error}
           </div>
         )}
@@ -112,32 +112,32 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
               variant="outline"
               onClick={handleGoogle}
               disabled={loading}
-              className="h-11 w-full cursor-pointer rounded-full border-white/15 bg-white text-sm font-bold text-black hover:bg-zinc-200"
+              className="h-11 w-full cursor-pointer rounded-full border-line bg-white text-sm font-bold text-black hover:brightness-95"
             >
               <svg viewBox="0 0 24 24" className="mr-2 h-4 w-4" aria-hidden="true">
                 <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.3-1.6 3.8-5.4 3.8-3.3 0-5.9-2.7-5.9-6s2.6-6 5.9-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.3 14.6 2.4 12 2.4 6.7 2.4 2.4 6.7 2.4 12s4.3 9.6 9.6 9.6c5.5 0 9.2-3.9 9.2-9.4 0-.6-.1-1.1-.2-1.6H12z" />
               </svg>
               Continue with Google
             </Button>
-            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-zinc-600">
-              <span className="h-px flex-1 bg-white/5" />
+            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-ink-3">
+              <span className="h-px flex-1 bg-muted" />
               or with email
-              <span className="h-px flex-1 bg-white/5" />
+              <span className="h-px flex-1 bg-muted" />
             </div>
           </>
         )}
 
         {success && (
-          <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs py-3 px-4 rounded-lg text-center font-semibold">
+          <div className="bg-emerald-500/10 border border-emerald-500/20 text-success text-xs py-3 px-4 rounded-xl text-center font-semibold">
             {success}
           </div>
         )}
 
         <form onSubmit={handleEmailAuth} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-[9px] uppercase font-black text-zinc-500 tracking-wider">Email Address</label>
+            <label className="text-[9px] uppercase font-black text-ink-2 tracking-wider">Email Address</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-zinc-500 pointer-events-none">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-ink-2 pointer-events-none">
                 <HugeiconsIcon icon={Mail01Icon} className="h-4 w-4" />
               </span>
               <input
@@ -146,15 +146,15 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full h-10 pl-10 pr-4 rounded-lg bg-zinc-900 border border-white/5 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-neon-violet/50 focus:ring-1 focus:ring-neon-violet/20 transition-all font-medium"
+                className="w-full h-10 pl-10 pr-4 rounded-xl bg-surface border border-line text-ink text-xs placeholder:text-ink-3 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/20 transition-all font-medium"
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[9px] uppercase font-black text-zinc-500 tracking-wider">Password</label>
+            <label className="text-[9px] uppercase font-black text-ink-2 tracking-wider">Password</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-zinc-500 pointer-events-none">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-ink-2 pointer-events-none">
                 <HugeiconsIcon icon={LockKeyIcon} className="h-4 w-4" />
               </span>
               <input
@@ -164,7 +164,7 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full h-10 pl-10 pr-4 rounded-lg bg-zinc-900 border border-white/5 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-neon-violet/50 focus:ring-1 focus:ring-neon-violet/20 transition-all font-medium"
+                className="w-full h-10 pl-10 pr-4 rounded-xl bg-surface border border-line text-ink text-xs placeholder:text-ink-3 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/20 transition-all font-medium"
               />
             </div>
           </div>
@@ -172,14 +172,14 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
           <Button
             type="submit"
             disabled={loading}
-            className="w-full h-10 rounded-full bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider hover:bg-neon-violet transition-all flex items-center justify-center gap-2 group cursor-pointer"
+            className="w-full h-10 rounded-full bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider hover:brightness-110 transition-all flex items-center justify-center gap-2 group cursor-pointer"
           >
             {loading ? "Processing..." : isSignUp ? "Create Account" : "Sign In"}
             <HugeiconsIcon icon={ArrowRight01Icon} className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </Button>
         </form>
 
-        <p className="text-center text-[10px] text-zinc-500 font-medium pt-3">
+        <p className="text-center text-[10px] text-ink-2 font-medium pt-3">
           {isSignUp ? "Already have an account?" : "Need an account?"}{" "}
           <button
             type="button"
@@ -188,7 +188,7 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
               setError(null);
               setSuccess(null);
             }}
-            className="text-neon-violet hover:underline font-bold"
+            className="text-brand hover:underline font-bold"
           >
             {isSignUp ? "Sign In" : "Sign Up Now"}
           </button>

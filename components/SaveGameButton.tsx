@@ -22,15 +22,14 @@ export default function SaveGameButton({ gameId, className }: SaveGameButtonProp
       onClick={() => toggle(gameId)}
       disabled={!ready}
       aria-pressed={saved}
-      className={`rounded-full border transition-all duration-300 ${
-        saved
-          ? "border-amber-500/40 bg-amber-500/10 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)] hover:bg-amber-500/20"
-          : "border-white/10 hover:border-amber-500/30 hover:text-amber-400"
+      className={`pressable h-9 rounded-full transition-all duration-300 ${
+        saved ? "accent-chip" : "btn-quiet text-ink-2 hover:text-diff-medium"
       } ${className ?? ""}`}
+      style={saved ? ({ "--chip": "var(--diff-medium)" } as React.CSSProperties) : undefined}
     >
       <HugeiconsIcon
         icon={StarIcon}
-        className={`h-4 w-4 transition-transform duration-300 ${saved ? "scale-110 fill-amber-400" : ""}`}
+        className={`h-4 w-4 transition-transform duration-300 ${saved ? "scale-110 fill-current" : ""}`}
       />
       <span>{saved ? "Saved" : "Save to Library"}</span>
     </Button>

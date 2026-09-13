@@ -5,12 +5,12 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon, Trophy, GamepadIcon } from "@hugeicons/core-free-icons";
 import { getGameBySlug, getGamesByCategory } from "@/lib/games";
 import { CATALOG } from "@/lib/catalog";
+import { categoryColor, difficultyColor } from "@/lib/accents";
 import SaveGameButton from "@/components/SaveGameButton";
 import GameScreen from "@/components/GameScreen";
 import Leaderboard from "@/components/Leaderboard";
 import { GameCard } from "@/components/GameCard";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
@@ -57,122 +57,100 @@ export default async function GameDetailPage({ params }: PageProps) {
   const relatedList = await getGamesByCategory(game.category);
   const relatedGames = relatedList.filter(g => g.slug !== game.slug).slice(0, 3);
 
-  // Difficulty badge colors
-  const diffBadgeClass = {
-    Easy: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    Medium: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-    Hard: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-  }[game.difficulty as "Easy" | "Medium" | "Hard"] || "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
-
-  // Parse rules list
   const rules = (game.rulesJson as string[]) || [];
-  
-  // Parse controls JSON
   const controls = (game.controlsJson as Record<string, string>) || {};
+  const cat = categoryColor(game.category);
+  const diff = difficultyColor(game.difficulty);
 
   return (
     <>
       <Navbar />
 
-      <main className="flex-1 bg-zinc-950 bg-grid-pattern py-8">
+      <main className="flex-1 pb-24 pt-8 sm:pt-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          
-          {/* Back Nav Link */}
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-500 hover:text-white transition-colors uppercase tracking-wider mb-6 group"
+            className="group mb-8 inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-2 transition-colors hover:text-ink"
           >
             <HugeiconsIcon icon={ArrowLeft01Icon} className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-            Back to games
+            All games
           </Link>
 
-          {/* Game Header Row */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-            <div className="space-y-2.5">
-              <div className="flex items-center flex-wrap gap-2.5">
-                <Badge className="bg-zinc-900 border-white/5 text-zinc-400 uppercase tracking-widest text-[9px] px-2.5 py-0.5 font-bold">
+          <div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+            <div>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-[12px] font-semibold uppercase tracking-[0.1em]" style={{ color: cat }}>
                   {game.category}
-                </Badge>
-                <Badge variant="outline" className={`uppercase tracking-wider text-[9px] font-extrabold px-2.5 py-0.5 ${diffBadgeClass}`}>
+                </span>
+                <span className="text-ink-3">·</span>
+                <span
+                  className="accent-chip rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em]"
+                  style={{ "--chip": diff } as React.CSSProperties}
+                >
                   {game.difficulty}
-                </Badge>
+                </span>
               </div>
-              <h1 className="text-3xl sm:text-5xl font-black uppercase tracking-tight text-white">
-                {game.title}
-              </h1>
+              <h1 className="text-[40px] font-black leading-none tracking-[-0.04em] text-ink sm:text-[56px]">{game.title}</h1>
             </div>
 
             <div className="flex items-center gap-3">
               <SaveGameButton gameId={game.id} />
-              <div className="rounded-full border border-white/5 bg-zinc-900/30 px-4 py-2 text-right">
-                <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-bold">
-                  Total Plays
-                </span>
-                <span className="text-sm font-black text-white">
-                  {game.plays.toLocaleString()}
-                </span>
+              <div className="glass rounded-full px-4 py-2 text-right">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-3">Plays</span>
+                <span className="font-mono text-[14px] font-bold text-ink">{game.plays.toLocaleString()}</span>
               </div>
             </div>
           </div>
 
-          {/* Main Workspace Split */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
-            
-            {/* Play Viewport Column */}
-            <div className="lg:col-span-2 space-y-6">
+          <div className="mb-20 grid grid-cols-1 gap-8 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
               <GameScreen gameId={game.id} gameTitle={game.title} gameSlug={game.slug} />
-              
-              {/* Game Info Panel */}
-              <GlassCard glowColor="none" className="border-white/5 bg-zinc-900/20! p-6">
-                <h3 className="text-lg font-bold uppercase tracking-tight text-white mb-2">
-                  About the game
-                </h3>
-                <p className="text-sm text-zinc-400 leading-relaxed">
-                  {game.description}
-                </p>
+
+              <GlassCard>
+                <h2 className="mb-2 text-[15px] font-bold text-ink">About</h2>
+                <p className="text-[15px] leading-relaxed text-ink-2">{game.description}</p>
               </GlassCard>
             </div>
 
-            {/* Side HUD Configuration Column */}
             <div className="space-y-6">
-              
-              {/* Controls Panel */}
-              <GlassCard glowColor="none" className="border-white/5 bg-zinc-900/20! p-6">
-                <div className="flex items-center gap-2 text-neon-violet font-bold text-xs uppercase tracking-widest mb-4">
+              <GlassCard>
+                <div className="mb-4 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.1em]" style={{ color: cat }}>
                   <HugeiconsIcon icon={GamepadIcon} className="h-4 w-4" />
-                  Controls Configuration
+                  Controls
                 </div>
-                
                 {Object.keys(controls).length === 0 ? (
-                  <p className="text-xs text-zinc-500">No special control configurations needed.</p>
+                  <p className="text-[13px] text-ink-2">No special controls.</p>
                 ) : (
-                  <div className="space-y-3">
+                  <dl className="space-y-3">
                     {Object.entries(controls).map(([action, binding]) => (
-                      <div key={action} className="flex items-center justify-between text-xs pb-2 border-b border-white/5 last:border-0 last:pb-0">
-                        <span className="font-semibold text-zinc-400 capitalize">{action}</span>
-                        <kbd className="rounded bg-zinc-800 border border-white/8 px-2 py-0.5 font-mono text-white text-[10px]">
-                          {binding}
-                        </kbd>
+                      <div key={action} className="flex items-start justify-between gap-4 border-b border-line pb-3 text-[13px] last:border-0 last:pb-0">
+                        <dt className="capitalize text-ink-2">{action}</dt>
+                        <dd className="text-right">
+                          <kbd className="rounded-md border border-line bg-muted px-2 py-0.5 font-mono text-[11px] text-ink">
+                            {binding}
+                          </kbd>
+                        </dd>
                       </div>
                     ))}
-                  </div>
+                  </dl>
                 )}
               </GlassCard>
 
-              {/* Instructions Rules Panel */}
-              <GlassCard glowColor="none" className="border-white/5 bg-zinc-900/20! p-6">
-                <div className="flex items-center gap-2 text-neon-cyan font-bold text-xs uppercase tracking-widest mb-4">
+              <GlassCard>
+                <div className="mb-4 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.1em]" style={{ color: cat }}>
                   <HugeiconsIcon icon={Trophy} className="h-4 w-4" />
-                  Game Rules & Objectives
+                  How to win
                 </div>
-                
                 {rules.length === 0 ? (
-                  <p className="text-xs text-zinc-500">Play and explore the game rules freely.</p>
+                  <p className="text-[13px] text-ink-2">Play and find out.</p>
                 ) : (
                   <ul className="space-y-3">
                     {rules.map((rule, idx) => (
-                      <li key={idx} className="flex gap-2.5 text-xs text-zinc-400 leading-relaxed align-top">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-950 border border-white/5 font-bold text-neon-cyan text-[10px]">
+                      <li key={idx} className="flex gap-3 text-[13.5px] leading-relaxed text-ink-2">
+                        <span
+                          className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                          style={{ color: cat, background: `color-mix(in srgb, ${cat} 14%, transparent)` }}
+                        >
                           {idx + 1}
                         </span>
                         <span>{rule}</span>
@@ -183,25 +161,19 @@ export default async function GameDetailPage({ params }: PageProps) {
               </GlassCard>
 
               <Leaderboard gameId={game.id} gameSlug={game.slug} />
-
             </div>
-
           </div>
 
-          {/* Related Games Row */}
           {relatedGames.length > 0 && (
-            <div className="border-t border-white/5 pt-16">
-              <h3 className="text-2xl font-black uppercase tracking-tight text-white mb-8">
-                Related {game.category} Games
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="border-t border-line pt-16">
+              <h2 className="mb-8 text-[26px] font-black tracking-[-0.03em] text-ink">More {game.category.toLowerCase()} games</h2>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 {relatedGames.map((rg) => (
                   <GameCard key={rg.slug} {...rg} />
                 ))}
               </div>
             </div>
           )}
-
         </div>
       </main>
 

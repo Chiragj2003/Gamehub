@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PlayIcon, GamepadIcon, TimerIcon, FullScreenIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createPlaySession, type PlaySession } from "@/lib/session";
 import GameRenderer from "./GameRenderer";
@@ -123,32 +122,28 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
   };
 
   if (!mounted) {
-    return <Skeleton className="aspect-video w-full rounded-xl" />;
+    return <Skeleton className="aspect-video w-full rounded-3xl" />;
   }
 
   if (!playing) {
     return (
-      <div className="relative flex aspect-video w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-zinc-950 p-8 text-center">
-        <div className="pointer-events-none absolute inset-0 bg-radial from-neon-violet/10 via-transparent to-transparent" />
-        <div className="pointer-events-none absolute inset-0 bg-grid-pattern opacity-10" />
-
-        <div className="relative z-10 max-w-sm space-y-6">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/8 bg-zinc-900 text-neon-violet">
+      <div className="glass relative flex w-full flex-col items-center justify-center overflow-hidden rounded-3xl px-6 py-10 text-center sm:aspect-video sm:p-8">
+        <div className="relative z-10 w-full max-w-sm space-y-5">
+          <div className="glass mx-auto flex h-16 w-16 items-center justify-center rounded-2xl text-brand">
             <HugeiconsIcon icon={GamepadIcon} className="h-8 w-8" />
           </div>
           <div>
-            <h3 className="text-2xl font-black uppercase tracking-tight text-white">{gameTitle}</h3>
-            <p className="mt-2 text-sm text-zinc-400">
-              Loads instantly in the page. Press P or Esc to pause at any time.
-            </p>
+            <h3 className="text-[26px] font-black tracking-[-0.03em] text-ink">{gameTitle}</h3>
+            <p className="mt-2 text-[14px] text-ink-2">Loads instantly. P or Esc pauses; tap to resume on touch.</p>
           </div>
-          <Button
+          <button
+            type="button"
             onClick={start}
-            className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-primary font-bold uppercase tracking-wide text-primary-foreground shadow-[0_0_20px_rgba(139,92,246,0.3)] transition-all duration-200 hover:bg-neon-violet hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] active:scale-98"
+            className="btn-glow flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full text-[15px] font-semibold"
           >
             <HugeiconsIcon icon={PlayIcon} className="h-5 w-5 fill-current" />
-            Play Now
-          </Button>
+            Play now
+          </button>
         </div>
       </div>
     );
@@ -160,10 +155,10 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
       className={
         fullscreen
           ? "fixed inset-0 z-[60] flex flex-col bg-black"
-          : "relative flex w-full flex-col overflow-hidden rounded-xl border border-white/5 bg-zinc-950 aspect-[4/3] max-h-[78vh] md:aspect-video"
+          : "relative flex w-full flex-col overflow-hidden rounded-3xl border border-line bg-[#0a0a0d] shadow-[var(--shadow-lift)] aspect-[4/3] max-h-[78vh] md:aspect-video"
       }
     >
-      <div className="relative z-20 flex h-10 shrink-0 items-center justify-between border-b border-white/5 bg-black/60 px-3 text-xs text-zinc-400 sm:px-4">
+      <div className="relative z-20 flex h-10 shrink-0 items-center justify-between border-b border-white/10 bg-black/60 px-3 text-xs text-zinc-400 backdrop-blur-md sm:px-4">
         <div className="flex min-w-0 items-center gap-2">
           <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
           <span className="truncate font-semibold text-zinc-300">{gameTitle}</span>
@@ -182,7 +177,7 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
             onClick={fullscreen ? exitFullscreen : enterFullscreen}
             aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"}
             title={fullscreen ? "Exit fullscreen" : "Fullscreen"}
-            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-white/10 text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
+            className="pressable flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-white/10 text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
           >
             <HugeiconsIcon icon={fullscreen ? Cancel01Icon : FullScreenIcon} className="h-3.5 w-3.5" />
           </button>
@@ -197,7 +192,7 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
 
       {/* min-h-0 lets the flex item shrink so the canvas's max-height resolves;
           without it the canvas keeps its intrinsic size and overflows. */}
-      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-zinc-950">
+      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-[#0a0a0d]">
         <GameErrorBoundary key={runKey} onReset={() => setRunKey((k) => k + 1)}>
           <GameRenderer key={runKey} slug={gameSlug} onGameOver={handleGameOver} />
         </GameErrorBoundary>

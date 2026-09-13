@@ -39,7 +39,7 @@ export default class GameErrorBoundary extends React.Component<Props, State> {
     return (
       <div
         role="alert"
-        className="flex h-full w-full flex-col items-center justify-center gap-4 bg-zinc-950 p-8 text-center"
+        className="flex h-full w-full flex-col items-center justify-center gap-4 bg-[#0a0a0d] p-8 text-center"
       >
         <div>
           <h3 className="text-lg font-black uppercase tracking-tight text-white">
@@ -51,7 +51,7 @@ export default class GameErrorBoundary extends React.Component<Props, State> {
         </div>
         <button
           onClick={this.reset}
-          className="h-10 cursor-pointer rounded-full bg-white px-6 text-xs font-bold uppercase tracking-wider text-black transition-opacity hover:opacity-90"
+          className="btn-glow h-10 cursor-pointer rounded-full px-6 text-[13px] font-semibold"
         >
           Restart game
         </button>

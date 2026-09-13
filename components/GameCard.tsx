@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PlayIcon, StarIcon } from "@hugeicons/core-free-icons";
-import { Badge } from "./ui/badge";
+import { categoryColor, difficultyColor } from "@/lib/accents";
 
 interface GameCardProps {
   title: string;
@@ -12,70 +12,66 @@ interface GameCardProps {
   rating: number;
   plays: number;
   slug: string;
-  thumbnailUrl?: string | null;
 }
 
-export function GameCard({
-  title,
-  description,
-  category,
-  difficulty,
-  rating,
-  plays,
-  slug,
-}: GameCardProps) {
-  const diffColors: Record<string, string> = {
-    Easy: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    Medium: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-    Hard: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-  };
-
-  const badgeClass = diffColors[difficulty] || diffColors.Easy;
-
-  const accentColor = difficulty === "Easy" ? "group-hover:border-emerald-500/30"
-    : difficulty === "Medium" ? "group-hover:border-cyan-500/30"
-    : "group-hover:border-violet-500/30";
+/**
+ * One game. The whole card is the link; the category colour bleeds into the
+ * hover shadow so the grid reads as four families of games, not ten boxes.
+ */
+export function GameCard({ title, description, category, difficulty, rating, plays, slug }: GameCardProps) {
+  const cat = categoryColor(category);
+  const diff = difficultyColor(difficulty);
 
   return (
-    <Link href={`/games/${slug}`} className="block h-full">
-      <div className={`group flex h-full flex-col rounded-xl border border-white/6 bg-zinc-900/30 hover:bg-zinc-900/50 transition-all duration-200 overflow-hidden ${accentColor}`}>
-        {/* Thumbnail area */}
-        <div className="relative aspect-[16/10] w-full bg-zinc-950 flex items-center justify-center border-b border-white/5">
-          <div className="text-zinc-700 group-hover:text-zinc-500 transition-colors">
-            <HugeiconsIcon icon={PlayIcon} className="h-8 w-8" />
-          </div>
-          {/* Hover overlay */}
-          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
-              <HugeiconsIcon icon={PlayIcon} className="h-5 w-5 text-white fill-current" />
-            </div>
-          </div>
+    <Link
+      href={`/games/${slug}`}
+      aria-label={`Play ${title}`}
+      className="glass-card group flex h-full flex-col overflow-hidden rounded-3xl focus-visible:outline-2"
+      style={{ "--card-accent": cat } as React.CSSProperties}
+    >
+      {/* Art well: the category colour as a soft field with the game's initials. */}
+      <div
+        className="relative flex aspect-[16/10] items-center justify-center overflow-hidden"
+        style={{ background: `linear-gradient(160deg, color-mix(in srgb, ${cat} 22%, transparent), transparent 70%)` }}
+      >
+        <span
+          className="select-none text-[64px] font-black leading-none tracking-[-0.06em] transition-transform duration-500 ease-[var(--ease-out)] group-hover:scale-110"
+          style={{ color: `color-mix(in srgb, ${cat} 55%, transparent)` }}
+          aria-hidden="true"
+        >
+          {title.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase()}
+        </span>
+
+        {/* Play affordance: hidden until hover/focus so the grid stays calm. */}
+        <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors duration-300 group-hover:bg-black/10 group-focus-visible:bg-black/10">
+          <span className="btn-glow flex h-12 w-12 scale-75 items-center justify-center rounded-full opacity-0 transition-all duration-300 ease-[var(--ease-spring)] group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100">
+            <HugeiconsIcon icon={PlayIcon} className="ml-0.5 h-5 w-5 fill-current" />
+          </span>
+        </span>
+      </div>
+
+      <div className="flex flex-1 flex-col p-5">
+        <div className="mb-2.5 flex items-center justify-between gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em]" style={{ color: cat }}>
+            {category}
+          </span>
+          <span
+            className="accent-chip rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em]"
+            style={{ "--chip": diff } as React.CSSProperties}
+          >
+            {difficulty}
+          </span>
         </div>
 
-        {/* Card body */}
-        <div className="flex flex-1 flex-col p-4">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">{category}</span>
-            <Badge variant="outline" className={`px-1.5 py-0 text-[9px] uppercase font-bold tracking-wider ${badgeClass}`}>
-              {difficulty}
-            </Badge>
-          </div>
+        <h3 className="text-[17px] font-bold tracking-[-0.01em] text-ink">{title}</h3>
+        <p className="mt-1.5 line-clamp-2 flex-1 text-[13.5px] leading-relaxed text-ink-2">{description}</p>
 
-          <h3 className="text-base font-bold tracking-tight text-white group-hover:text-primary transition-colors">
-            {title}
-          </h3>
-          
-          <p className="mt-1.5 text-[13px] text-zinc-500 line-clamp-2 leading-relaxed flex-1">
-            {description}
-          </p>
-
-          <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-zinc-500">
-            <div className="flex items-center gap-1">
-              <HugeiconsIcon icon={StarIcon} className="h-3.5 w-3.5 text-amber-400 fill-amber-400/20" />
-              <span className="font-medium text-zinc-300">{rating.toFixed(1)}</span>
-            </div>
-            <span className="font-medium">{plays.toLocaleString()} plays</span>
-          </div>
+        <div className="mt-4 flex items-center justify-between border-t border-line pt-3.5 text-xs text-ink-3">
+          <span className="flex items-center gap-1">
+            <HugeiconsIcon icon={StarIcon} className="h-3.5 w-3.5 fill-current text-diff-medium" />
+            <span className="font-semibold text-ink-2">{rating.toFixed(1)}</span>
+          </span>
+          <span className="font-medium">{plays.toLocaleString()} plays</span>
         </div>
       </div>
     </Link>

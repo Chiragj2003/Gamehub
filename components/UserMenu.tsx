@@ -53,7 +53,7 @@ export default function UserMenu({ user }: UserMenuProps) {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="relative h-9 w-9 rounded-full border border-white/5 hover:border-neon-violet/30 hover:bg-zinc-950/60 p-0 overflow-hidden flex items-center justify-center transition-all cursor-pointer"
+          className="relative h-9 w-9 rounded-full border border-line hover:border-brand/30 hover:bg-surface p-0 overflow-hidden flex items-center justify-center transition-all cursor-pointer"
         >
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -64,33 +64,33 @@ export default function UserMenu({ user }: UserMenuProps) {
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-neon-violet to-neon-cyan text-white text-xs font-black">
+            <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-neon-violet to-neon-cyan text-ink text-xs font-black">
               {getInitials()}
             </div>
           )}
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-56 border-white/5 bg-zinc-950/95 backdrop-blur-xl p-1.5">
+      <DropdownMenuContent align="end" className="w-56 border-line bg-surface p-1.5">
         <DropdownMenuLabel className="px-2.5 py-2">
           <div className="flex flex-col space-y-0.5">
-            <p className="text-xs font-bold text-white truncate">{getUsername()}</p>
-            <p className="text-[10px] text-zinc-500 font-medium truncate">{user.email}</p>
+            <p className="text-xs font-bold text-ink truncate">{getUsername()}</p>
+            <p className="text-[10px] text-ink-2 font-medium truncate">{user.email}</p>
           </div>
         </DropdownMenuLabel>
         
         <DropdownMenuSeparator />
         
         <DropdownMenuItem asChild>
-          <Link href="/library" className="flex items-center gap-2 cursor-pointer text-zinc-300 hover:text-white px-2.5 py-2 text-xs">
-            <HugeiconsIcon icon={StarIcon} className="h-4 w-4 text-zinc-400" />
+          <Link href="/library" className="flex items-center gap-2 cursor-pointer text-ink hover:text-ink px-2.5 py-2 text-xs">
+            <HugeiconsIcon icon={StarIcon} className="h-4 w-4 text-ink-2" />
             <span>My Library</span>
           </Link>
         </DropdownMenuItem>
 
         <DropdownMenuItem asChild>
-          <Link href="/leaderboard" className="flex items-center gap-2 cursor-pointer text-zinc-300 hover:text-white px-2.5 py-2 text-xs">
-            <HugeiconsIcon icon={Trophy} className="h-4 w-4 text-zinc-400" />
+          <Link href="/leaderboard" className="flex items-center gap-2 cursor-pointer text-ink hover:text-ink px-2.5 py-2 text-xs">
+            <HugeiconsIcon icon={Trophy} className="h-4 w-4 text-ink-2" />
             <span>Leaderboards</span>
           </Link>
         </DropdownMenuItem>
@@ -99,9 +99,9 @@ export default function UserMenu({ user }: UserMenuProps) {
 
         <DropdownMenuItem
           onClick={handleSignOut}
-          className="flex items-center gap-2 cursor-pointer text-rose-400 focus:bg-rose-500/10 focus:text-rose-400 px-2.5 py-2 text-xs"
+          className="flex items-center gap-2 cursor-pointer text-danger focus:bg-danger/10 focus:text-danger px-2.5 py-2 text-xs"
         >
-          <HugeiconsIcon icon={Logout01Icon} className="h-4 w-4 text-rose-400" />
+          <HugeiconsIcon icon={Logout01Icon} className="h-4 w-4 text-danger" />
           <span>Sign Out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { categoryColor } from "@/lib/accents";
 
 interface CategoryFilterProps {
   categories: string[];
@@ -10,39 +11,39 @@ interface CategoryFilterProps {
   className?: string;
 }
 
-export default function CategoryFilter({
-  categories,
-  selectedCategory,
-  onSelectCategory,
-  className,
-}: CategoryFilterProps) {
+/** Segmented glass control; the selected segment takes its category's colour. */
+export default function CategoryFilter({ categories, selectedCategory, onSelectCategory, className }: CategoryFilterProps) {
+  const items: Array<{ label: string; value: string | null }> = [
+    { label: "All", value: null },
+    ...categories.map((c) => ({ label: c, value: c })),
+  ];
+
   return (
-    <div className={cn("flex flex-wrap gap-2.5", className)}>
-      <button
-        onClick={() => onSelectCategory(null)}
-        className={cn(
-          "rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all duration-300 border cursor-pointer",
-          selectedCategory === null
-            ? "border-neon-violet bg-neon-violet/10 text-white shadow-[0_0_15px_rgba(139,92,246,0.25)]"
-            : "border-white/5 text-zinc-400 bg-white/5 hover:border-white/15 hover:text-white"
-        )}
-      >
-        All Games
-      </button>
-      {categories.map((cat) => {
-        const isSelected = selectedCategory?.toLowerCase() === cat.toLowerCase();
+    <div
+      role="tablist"
+      aria-label="Filter by category"
+      className={cn("glass inline-flex max-w-full gap-1 overflow-x-auto rounded-full p-1", className)}
+    >
+      {items.map(({ label, value }) => {
+        const selected = (selectedCategory ?? null)?.toLowerCase() === (value ?? null)?.toLowerCase();
+        const color = value ? categoryColor(value) : "var(--brand)";
         return (
           <button
-            key={cat}
-            onClick={() => onSelectCategory(cat)}
+            key={label}
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onSelectCategory(value)}
             className={cn(
-              "rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all duration-300 border cursor-pointer",
-              isSelected
-                ? "border-neon-violet bg-neon-violet/10 text-white shadow-[0_0_15px_rgba(139,92,246,0.25)]"
-                : "border-white/5 text-zinc-400 bg-white/5 hover:border-white/15 hover:text-white"
+              "pressable shrink-0 cursor-pointer rounded-full px-4 py-1.5 text-[13px] font-semibold transition-all duration-200",
+              selected ? "text-ink shadow-[inset_0_1px_0_var(--highlight),var(--shadow)]" : "text-ink-2 hover:text-ink"
             )}
+            style={
+              selected
+                ? { background: `color-mix(in srgb, ${color} 14%, var(--bg-elevated))`, boxShadow: `inset 0 1px 0 var(--highlight), 0 0 16px -4px color-mix(in srgb, ${color} 50%, transparent)` }
+                : undefined
+            }
           >
-            {cat}
+            {label}
           </button>
         );
       })}
