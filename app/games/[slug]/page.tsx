@@ -34,14 +34,20 @@ export async function generateMetadata({ params }: PageProps) {
 
   if (!game) {
     return {
-      title: "Game Not Found | Game Hub",
+      title: "Game not found",
       description: "This game could not be found in our registry catalog.",
     };
   }
 
   return {
-    title: `${game.title} - Play Online | Game Hub Remasters`,
+    title: game.title,
     description: game.description,
+    openGraph: {
+      title: `${game.title} — play free in your browser`,
+      description: game.description,
+      url: `/games/${game.slug}`,
+    },
+    twitter: { card: "summary_large_image", title: `${game.title} — Game Hub`, description: game.description },
   };
 }
 

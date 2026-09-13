@@ -42,6 +42,7 @@ Every game runs at the same speed on every screen, works on phones and tablets w
 
 - **Leaderboards** are per-game, top 10. Every run opens a server-side session when you press Play; a score can only be attached to that session, the server measures the play time itself, and anything impossible for the game or the time is rejected. Submissions are rate-limited. Your own best on this device is shown separately, never mixed into the global board.
 - **My Library** keeps the games you've saved. Sign in with email and it follows your account across devices; anything you saved before signing in is merged in. Without an account it stays on the device.
+- **Your account** (`/account`) shows your sign-in, lets you change your password, sign out, or delete the account and everything tied to it. Forgot your password? The sign-in dialog has a reset link.
 - Every score is also saved locally on your device first, so a dropped connection never loses a run.
 
 ---
@@ -67,12 +68,14 @@ The site runs without a database — games, local scores and the device library 
 1. Create a project at [supabase.com/dashboard](https://supabase.com/dashboard) (free tier is fine).
 2. SQL Editor → New query → paste the whole of [`supabase.sql`](supabase.sql) → Run. Safe to re-run; it creates tables, policies, the stats view, and seeds the ten games.
 3. Project Settings → API: copy the **Project URL** and the **anon / publishable key**.
-4. Vercel → your project → Settings → Environment Variables: set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` for **all** environments (Production, Preview, Development). Redeploy.
+4. Vercel → your project → Settings → Environment Variables: set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` for **all** environments (Production, Preview, Development), plus `SUPABASE_SERVICE_ROLE_KEY` (server-only; it powers account deletion). Redeploy.
 5. Confirm: open `https://your-site/api/health`. It reports whether the database is reachable, how many games it holds, and what to fix if not.
 
 Online Pong uses Supabase Realtime, which is on by default. To offer Google sign-in, enable the Google provider in Supabase → Authentication → Providers, then set `NEXT_PUBLIC_AUTH_GOOGLE=1`. Optional: the Upstash variables in `.env.example` share rate limits across serverless instances.
 
 **Which games do people finish?** In the SQL editor: `SELECT * FROM game_stats ORDER BY starts DESC;` — starts, scored runs, completion %, average play time and top score per game.
+
+The site ships `robots.txt`, `sitemap.xml`, a web-app manifest with generated icons (installable on phones), an Open Graph image, security headers, a branded 404 and error page, and a skip-to-content link. Set `NEXT_PUBLIC_SITE_URL` once you have a custom domain so those point at it.
 
 **Before every push, run `npm run verify`.** It typechecks, lints, and builds with `.env.local` hidden and a clean `.next` — the same conditions as a Vercel Preview deploy.
 

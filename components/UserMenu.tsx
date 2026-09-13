@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { StarIcon, Trophy, Logout01Icon } from "@hugeicons/core-free-icons";
+import { StarIcon, Trophy, Logout01Icon, UserCircleIcon } from "@hugeicons/core-free-icons";
 
 interface UserMenuProps {
   user: User;
@@ -81,6 +81,13 @@ export default function UserMenu({ user }: UserMenuProps) {
         
         <DropdownMenuSeparator />
         
+        <DropdownMenuItem asChild>
+          <Link href="/account" className="flex items-center gap-2 cursor-pointer text-ink hover:text-ink px-2.5 py-2 text-xs">
+            <HugeiconsIcon icon={UserCircleIcon} className="h-4 w-4 text-ink-2" />
+            Account
+          </Link>
+        </DropdownMenuItem>
+
         <DropdownMenuItem asChild>
           <Link href="/library" className="flex items-center gap-2 cursor-pointer text-ink hover:text-ink px-2.5 py-2 text-xs">
             <HugeiconsIcon icon={StarIcon} className="h-4 w-4 text-ink-2" />

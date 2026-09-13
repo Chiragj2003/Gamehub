@@ -8,7 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ShieldKeyIcon, ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Game Hub",
+  title: "Privacy Policy",
   description: "What Game Hub stores, what it doesn't, and how to delete it. No ads, no tracking.",
 };
 
@@ -98,18 +98,13 @@ export default function PrivacyPage() {
             <Section title="Deleting your data">
               <p>
                 You can remove games from your library at any time from the game page. To delete your account and
-                everything tied to it — your email, your library, and any scores linked to your account — open an
-                issue on the{" "}
-                <a
-                  href="https://github.com/Chiragj2003/Gamehub"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-brand underline-offset-4 hover:underline"
-                >
-                  Game Hub repository
-                </a>{" "}
-                or contact us from the email on your account, and we will delete it. Leaderboard entries that were
-                posted without an account carry only three initials and a score and cannot be traced back to you.
+                everything tied to it — your email, your sign-in, and your saved library — open{" "}
+                <Link href="/account" className="font-medium text-brand underline-offset-4 hover:underline">
+                  your account page
+                </Link>{" "}
+                and choose “Delete account”. It takes effect immediately and cannot be undone. Leaderboard entries are
+                never linked to an account — they carry only three initials and a score — so they remain and cannot
+                be traced back to you.
               </p>
             </Section>
 

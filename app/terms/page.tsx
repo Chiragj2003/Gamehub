@@ -8,7 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { LegalDocument01Icon, ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Game Hub",
+  title: "Terms of Service",
   description: "The rules for playing on Game Hub: free games, fair leaderboards, and what happens to your account.",
 };
 
@@ -75,8 +75,11 @@ export default function TermsPage() {
             <Section title="Accounts">
               <p>
                 An account needs an email address and a password, or a sign-in through a provider we support. You are
-                responsible for keeping your sign-in details private. You can delete your account at any time, which
-                removes your saved library and any data tied to your account; see the{" "}
+                responsible for keeping your sign-in details private. You can delete your account at any time from{" "}
+                <Link href="/account" className="font-medium text-brand underline-offset-4 hover:underline">
+                  your account page
+                </Link>
+                , which removes your sign-in and saved library; see the{" "}
                 <Link href="/privacy" className="font-medium text-brand underline-offset-4 hover:underline">
                   Privacy Policy
                 </Link>{" "}

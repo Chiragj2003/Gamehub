@@ -45,6 +45,28 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
     }
   };
 
+  const handleForgot = async () => {
+    setError(null);
+    setSuccess(null);
+    if (!email) {
+      setError("Enter your email above first, then tap “Forgot password?”.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account/reset")}`,
+      });
+      if (error) throw error;
+      setSuccess("Check your email for a link to set a new password.");
+    } catch (err: unknown) {
+      const raw = err instanceof Error ? err.message : "Could not send the reset email.";
+      setError(/fetch|network|ENOTFOUND/i.test(raw) ? "The account service can't be reached right now." : raw);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -152,7 +174,19 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
           </div>
 
           <div className="space-y-1">
-            <label className="text-[9px] uppercase font-black text-ink-2 tracking-wider">Password</label>
+            <div className="flex items-center justify-between">
+              <label className="text-[9px] uppercase font-black text-ink-2 tracking-wider">Password</label>
+              {!isSignUp && (
+                <button
+                  type="button"
+                  onClick={handleForgot}
+                  disabled={loading}
+                  className="cursor-pointer text-[11px] font-medium text-brand underline-offset-4 hover:underline disabled:opacity-50"
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-ink-2 pointer-events-none">
                 <HugeiconsIcon icon={LockKeyIcon} className="h-4 w-4" />
