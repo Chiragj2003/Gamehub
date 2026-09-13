@@ -32,15 +32,48 @@ const LOCK_DELAY_MS = 500;
 /** Number of moves that may reset the lock timer, so it cannot be stalled forever. */
 const MAX_LOCK_RESETS = 15;
 
+/**
+ * Piece shapes in their SRS spawn orientation, each inside the fixed bounding
+ * box SRS rotates about (4x4 for I, 3x3 for the rest). Rotating the box in
+ * place is what makes the kick tables below line up with the official ones.
+ */
 const SHAPES: number[][][] = [
   [],
-  [[1, 1, 1, 1]], // I
-  [[0, 2, 0], [2, 2, 2]], // T
-  [[3, 0, 0], [3, 3, 3]], // J
-  [[0, 0, 4], [4, 4, 4]], // L
-  [[5, 5], [5, 5]], // O
-  [[0, 6, 6], [6, 6, 0]], // S
-  [[7, 7, 0], [0, 7, 7]], // Z
+  [
+    [0, 0, 0, 0],
+    [1, 1, 1, 1],
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+  ], // I
+  [
+    [0, 2, 0],
+    [2, 2, 2],
+    [0, 0, 0],
+  ], // T
+  [
+    [3, 0, 0],
+    [3, 3, 3],
+    [0, 0, 0],
+  ], // J
+  [
+    [0, 0, 4],
+    [4, 4, 4],
+    [0, 0, 0],
+  ], // L
+  [
+    [5, 5],
+    [5, 5],
+  ], // O
+  [
+    [0, 6, 6],
+    [6, 6, 0],
+    [0, 0, 0],
+  ], // S
+  [
+    [7, 7, 0],
+    [0, 7, 7],
+    [0, 0, 0],
+  ], // Z
 ];
 
 const COLORS = [
@@ -54,32 +87,56 @@ const COLORS = [
   "#ef4444", // Z red
 ];
 
+const T_PIECE = 2;
+const I_PIECE = 1;
+const O_PIECE = 5;
+
+type Kick = [number, number];
+
 /**
- * Wall-kick offsets tried in order when a rotation collides.
- * Rotating flush against a wall or another piece previously just failed
- * silently; these nudges let the piece shift into a legal spot instead.
+ * Super Rotation System wall kicks, indexed by "from>to" rotation state
+ * (0 spawn, 1 clockwise, 2 flipped, 3 counter-clockwise). Offsets are tried
+ * in order; the first that fits is taken. Y is negated from the published
+ * tables because this grid grows downward.
  */
-const KICKS: Array<[number, number]> = [
-  [0, 0],
-  [-1, 0],
-  [1, 0],
-  [-2, 0],
-  [2, 0],
-  [0, -1],
-  [-1, -1],
-  [1, -1],
-];
+const KICKS_JLSTZ: Record<string, Kick[]> = {
+  "0>1": [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+  "1>0": [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+  "1>2": [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+  "2>1": [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+  "2>3": [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]],
+  "3>2": [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+  "3>0": [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+  "0>3": [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]],
+};
+
+const KICKS_I: Record<string, Kick[]> = {
+  "0>1": [[0, 0], [-2, 0], [1, 0], [-2, 1], [1, -2]],
+  "1>0": [[0, 0], [2, 0], [-1, 0], [2, -1], [-1, 2]],
+  "1>2": [[0, 0], [-1, 0], [2, 0], [-1, -2], [2, 1]],
+  "2>1": [[0, 0], [1, 0], [-2, 0], [1, 2], [-2, -1]],
+  "2>3": [[0, 0], [2, 0], [-1, 0], [2, -1], [-1, 2]],
+  "3>2": [[0, 0], [-2, 0], [1, 0], [-2, 1], [1, -2]],
+  "3>0": [[0, 0], [1, 0], [-2, 0], [1, 2], [-2, -1]],
+  "0>3": [[0, 0], [-1, 0], [2, 0], [-1, -2], [2, 1]],
+};
 
 type Matrix = number[][];
 
 function rotateCW(m: Matrix): Matrix {
-  const rows = m.length;
-  const cols = m[0].length;
-  const out: Matrix = Array.from({ length: cols }, () => Array(rows).fill(0));
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      out[c][rows - 1 - r] = m[r][c];
-    }
+  const n = m.length;
+  const out: Matrix = Array.from({ length: n }, () => Array(n).fill(0));
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) out[c][n - 1 - r] = m[r][c];
+  }
+  return out;
+}
+
+function rotateCCW(m: Matrix): Matrix {
+  const n = m.length;
+  const out: Matrix = Array.from({ length: n }, () => Array(n).fill(0));
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) out[n - 1 - c][r] = m[r][c];
   }
   return out;
 }
@@ -121,9 +178,18 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
     nextPiece: createBag(),
     matrix: [] as Matrix,
     type: 0,
+    rotation: 0,
     x: 0,
     y: 0,
     queued: 0,
+    held: 0,
+    /** Hold may be used once per piece; resets when a piece locks. */
+    holdUsed: false,
+    /** True when the last successful action was a rotation — needed for T-spins. */
+    lastWasRotate: false,
+    /** On-screen notice for a special clear, with a fade timer. */
+    notice: "",
+    noticeTimer: 0,
     score: 0,
     lines: 0,
     level: 1,
@@ -158,19 +224,59 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
     return false;
   };
 
-  const spawn = (s: typeof stateRef.current) => {
-    s.type = s.queued || s.nextPiece();
-    s.queued = s.nextPiece();
-    s.matrix = SHAPES[s.type].map((row) => [...row]);
+  const spawnType = (s: typeof stateRef.current, type: number) => {
+    s.type = type;
+    s.rotation = 0;
+    s.matrix = SHAPES[type].map((row) => [...row]);
     s.x = Math.floor((COLS - s.matrix[0].length) / 2);
-    s.y = 0;
+    // The I box has an empty top row; start it one higher so it appears at the top.
+    s.y = type === I_PIECE ? -1 : 0;
     s.grounded = false;
     s.lockTimer = 0;
     s.lockResets = 0;
+    s.lastWasRotate = false;
     if (collides(s, s.matrix, s.x, s.y)) s.over = true;
   };
 
+  const spawn = (s: typeof stateRef.current) => {
+    const type = s.queued || s.nextPiece();
+    s.queued = s.nextPiece();
+    s.holdUsed = false;
+    spawnType(s, type);
+  };
+
+  const hold = (s: typeof stateRef.current) => {
+    if (s.holdUsed) return;
+    s.holdUsed = true;
+    const swapped = s.held;
+    s.held = s.type;
+    if (swapped) spawnType(s, swapped);
+    else {
+      const type = s.queued;
+      s.queued = s.nextPiece();
+      spawnType(s, type);
+    }
+  };
+
+  /**
+   * 3-corner T-spin test: the T locked by a rotation and at least three of the
+   * four cells diagonal to its centre are filled (or off the grid).
+   */
+  const isTSpin = (s: typeof stateRef.current) => {
+    if (s.type !== T_PIECE || !s.lastWasRotate) return false;
+    const cx = s.x + 1;
+    const cy = s.y + 1;
+    let filled = 0;
+    for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const gx = cx + dx;
+      const gy = cy + dy;
+      if (gx < 0 || gx >= COLS || gy >= ROWS || (gy >= 0 && s.grid[gy][gx] !== 0)) filled++;
+    }
+    return filled >= 3;
+  };
+
   const clearLines = (s: typeof stateRef.current) => {
+    const tSpin = isTSpin(s);
     let cleared = 0;
     for (let r = ROWS - 1; r >= 0; r--) {
       if (s.grid[r].every((v) => v !== 0)) {
@@ -180,12 +286,24 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
         r++; // re-check this index; a row shifted down into it
       }
     }
-    if (cleared > 0) {
-      s.lines += cleared;
-      s.level = Math.floor(s.lines / 10) + 1;
+    if (tSpin) {
+      // T-spins score far more than the same clear done normally.
+      const base = [400, 800, 1200, 1600][Math.min(cleared, 3)];
+      s.score += base * s.level;
+      s.notice = ["T-SPIN", "T-SPIN SINGLE", "T-SPIN DOUBLE", "T-SPIN TRIPLE"][Math.min(cleared, 3)];
+      s.noticeTimer = 1.4;
+    } else if (cleared > 0) {
       // Standard scoring, multiplied by level so late clears are worth more.
       const base = [0, 100, 300, 500, 800][Math.min(cleared, 4)];
       s.score += base * s.level;
+      if (cleared === 4) {
+        s.notice = "TETRIS";
+        s.noticeTimer = 1.4;
+      }
+    }
+    if (cleared > 0) {
+      s.lines += cleared;
+      s.level = Math.floor(s.lines / 10) + 1;
     }
   };
 
@@ -204,6 +322,7 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
   const tryMove = (s: typeof stateRef.current, dx: number): boolean => {
     if (collides(s, s.matrix, s.x + dx, s.y)) return false;
     s.x += dx;
+    s.lastWasRotate = false;
     if (s.grounded && s.lockResets < MAX_LOCK_RESETS) {
       s.lockTimer = 0;
       s.lockResets++;
@@ -211,13 +330,19 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
     return true;
   };
 
-  const tryRotate = (s: typeof stateRef.current) => {
-    const rotated = rotateCW(s.matrix);
-    for (const [kx, ky] of KICKS) {
+  const tryRotate = (s: typeof stateRef.current, dir: 1 | -1) => {
+    if (s.type === O_PIECE) return;
+    const rotated = dir === 1 ? rotateCW(s.matrix) : rotateCCW(s.matrix);
+    const to = (s.rotation + dir + 4) % 4;
+    const table = s.type === I_PIECE ? KICKS_I : KICKS_JLSTZ;
+    const kicks = table[`${s.rotation}>${to}`];
+    for (const [kx, ky] of kicks) {
       if (!collides(s, rotated, s.x + kx, s.y + ky)) {
         s.matrix = rotated;
+        s.rotation = to;
         s.x += kx;
         s.y += ky;
+        s.lastWasRotate = true;
         if (s.grounded && s.lockResets < MAX_LOCK_RESETS) {
           s.lockTimer = 0;
           s.lockResets++;
@@ -240,7 +365,7 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
       if (s.over || s.paused) return;
       if (x < WIDTH / 3) tryMove(s, -1);
       else if (x > (2 * WIDTH) / 3) tryMove(s, 1);
-      else tryRotate(s);
+      else tryRotate(s, 1);
     },
   });
 
@@ -250,6 +375,13 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
     update: (dt) => {
       const s = stateRef.current;
       const io = input.current;
+      // Report once, on the first tick after the run ended. This sits above
+      // every early return so it cannot be skipped by whichever path set `over`.
+      if (s.over && !s.reported) {
+        s.reported = true;
+        const final = s.score;
+        setTimeout(() => onGameOverRef.current(final), 1200);
+      }
       if (!io) return;
 
       if (!s.initialised) {
@@ -289,7 +421,12 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
         }
       }
 
-      if (io.consumePress("up")) tryRotate(s);
+      // Rotate: Up or X clockwise, Z counter-clockwise. Hold: C or Shift.
+      while (io.consumePress("up") || io.consumeKey("x")) tryRotate(s, 1);
+      while (io.consumeKey("z")) tryRotate(s, -1);
+      if (io.consumeKey("c") || io.consumePress("secondary")) hold(s);
+
+      if (s.noticeTimer > 0) s.noticeTimer -= dt;
 
       if (io.consumePress("primary")) {
         // Hard drop: 2 points per cell, then lock immediately.
@@ -298,6 +435,7 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
           s.y++;
           dropped++;
         }
+        if (dropped > 0) s.lastWasRotate = false;
         s.score += dropped * 2;
         lockPiece(s);
         s.dropTimer = 0;
@@ -313,6 +451,7 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
         s.dropTimer = 0;
         if (!collides(s, s.matrix, s.x, s.y + 1)) {
           s.y++;
+          s.lastWasRotate = false;
           if (softDrop) s.score += 1;
           s.grounded = false;
           s.lockTimer = 0;
@@ -331,12 +470,6 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
       } else {
         s.grounded = false;
         s.lockTimer = 0;
-      }
-
-      if (s.over && !s.reported) {
-        s.reported = true;
-        const final = s.score;
-        setTimeout(() => onGameOverRef.current(final), 1200);
       }
     },
 
@@ -407,35 +540,57 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
       ctx.fillText(`LINES  ${s.lines}`, panelX, GRID_Y + 80);
       ctx.fillText(`LEVEL  ${s.level}`, panelX, GRID_Y + 100);
 
+      const drawMini = (type: number, x: number, y: number) => {
+        const shape = SHAPES[type];
+        const size = 16;
+        ctx.fillStyle = COLORS[type];
+        for (let r = 0; r < shape.length; r++) {
+          for (let c = 0; c < shape[r].length; c++) {
+            if (shape[r][c] === 0) continue;
+            ctx.fillRect(x + c * size, y + r * size, size - 2, size - 2);
+          }
+        }
+      };
+
       // Next-piece preview: planning the next placement is core to the game.
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 13px system-ui, sans-serif";
       ctx.fillText("NEXT", panelX, GRID_Y + 140);
-      if (s.queued) {
-        const preview = SHAPES[s.queued];
-        const size = 18;
-        ctx.fillStyle = COLORS[s.queued];
-        for (let r = 0; r < preview.length; r++) {
-          for (let c = 0; c < preview[r].length; c++) {
-            if (preview[r][c] === 0) continue;
-            ctx.fillRect(panelX + c * size, GRID_Y + 152 + r * size, size - 2, size - 2);
-          }
-        }
+      if (s.queued) drawMini(s.queued, panelX, GRID_Y + 150);
+
+      ctx.fillStyle = s.holdUsed ? "#52525b" : "#ffffff";
+      ctx.fillText("HOLD", panelX, GRID_Y + 226);
+      if (s.held) {
+        ctx.globalAlpha = s.holdUsed ? 0.4 : 1;
+        drawMini(s.held, panelX, GRID_Y + 236);
+        ctx.globalAlpha = 1;
+      }
+
+      if (s.noticeTimer > 0) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, s.noticeTimer);
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#facc15";
+        ctx.font = "bold 26px system-ui, sans-serif";
+        ctx.fillText(s.notice, GRID_X + (COLS * BLOCK) / 2, GRID_Y - 12);
+        ctx.restore();
       }
 
       ctx.fillStyle = "#a855f7";
       ctx.font = "bold 11px system-ui, sans-serif";
-      ctx.fillText("CONTROLS", panelX, GRID_Y + 250);
+      ctx.fillText("CONTROLS", panelX, GRID_Y + 318);
       ctx.fillStyle = "#52525b";
       ctx.font = "11px monospace";
       const hints = [
-        "← →  Move",
-        "↑    Rotate",
-        "↓    Soft drop",
+        "← →   Move",
+        "↑ / X  Rotate",
+        "Z      Rotate back",
+        "↓      Soft drop",
         "Space  Hard drop",
+        "C      Hold",
         "P      Pause",
       ];
-      hints.forEach((h, i) => ctx.fillText(h, panelX, GRID_Y + 272 + i * 18));
+      hints.forEach((h, i) => ctx.fillText(h, panelX, GRID_Y + 338 + i * 17));
 
       if (s.paused) drawPauseOverlay(ctx, WIDTH, HEIGHT);
       if (s.over) {

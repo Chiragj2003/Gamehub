@@ -99,7 +99,7 @@ export default async function GameDetailPage({ params }: PageProps) {
             </div>
 
             <div className="flex items-center gap-3">
-              <SaveGameButton gameId={game.id} gameSlug={game.slug} />
+              <SaveGameButton gameId={game.id} />
               <div className="rounded-full border border-white/5 bg-zinc-900/30 px-4 py-2 text-right">
                 <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-bold">
                   Total Plays

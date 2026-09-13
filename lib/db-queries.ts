@@ -45,7 +45,7 @@ export const FALLBACK_GAMES: Game[] = CATALOG.map((g) => ({
   rating: g.rating,
   plays: g.plays,
   thumbnailUrl: null,
-  iframeUrl: `/games/${g.slug}/embed`,
+  iframeUrl: null,
   controlsJson: g.controls,
   rulesJson: g.rules,
   createdAt: CATALOG_EPOCH,
@@ -334,8 +334,8 @@ export async function incrementGamePlayCount(id: number) {
 }
 
 // User Library Queries
-export async function queryUserLibrary(userId: string | null) {
-  if (!userId) return [];
+/** Ids of the games the signed-in user has saved. RLS scopes this to the caller. */
+export async function queryUserLibraryIds(userId: string): Promise<number[]> {
   return await runQuery(
     async () => {
       const supabase = await getSupabaseClient();
@@ -344,24 +344,19 @@ export async function queryUserLibrary(userId: string | null) {
         .select("game_id")
         .eq("user_id", userId);
       if (error) throw error;
-      const gameIds = (data || []).map((d: { game_id: string | number }) => Number(d.game_id));
-      if (gameIds.length === 0) return [];
-      
-      const allGames = await queryAllGames();
-      return allGames.filter(g => gameIds.includes(g.id));
+      return (data || []).map((d: { game_id: string | number }) => Number(d.game_id));
     },
     []
   );
 }
 
-export async function insertUserGame(userId: string | null, gameId: number) {
-  if (!userId) return false;
+export async function insertUserGame(userId: string, gameId: number): Promise<boolean> {
   try {
     const supabase = await getSupabaseClient();
-    const { error } = await supabase.from("user_games").insert({
-      user_id: userId,
-      game_id: gameId,
-    });
+    // Upsert on the (user, game) unique key so a double-tap is harmless.
+    const { error } = await supabase
+      .from("user_games")
+      .upsert({ user_id: userId, game_id: gameId }, { onConflict: "user_id,game_id", ignoreDuplicates: true });
     if (error) throw error;
     return true;
   } catch (error) {
@@ -370,8 +365,7 @@ export async function insertUserGame(userId: string | null, gameId: number) {
   }
 }
 
-export async function deleteUserGame(userId: string | null, gameId: number) {
-  if (!userId) return false;
+export async function deleteUserGame(userId: string, gameId: number): Promise<boolean> {
   try {
     const supabase = await getSupabaseClient();
     const { error } = await supabase
@@ -387,32 +381,91 @@ export async function deleteUserGame(userId: string | null, gameId: number) {
   }
 }
 
-// Analytics Queries
-export async function insertGameAnalytics(
-  gameId: number,
-  sessionId: string,
-  durationSeconds: number,
-  completed: boolean,
-  score?: number
-) {
+// Play sessions and leaderboards
+
+export interface PlaySessionRow {
+  sessionId: string;
+  gameId: number;
+  score: number | null;
+  createdAt: Date;
+}
+
+/**
+ * Open a session for a run. The server generates the id and stamps the start
+ * time, so neither can be forged by the client. Also counts the play.
+ */
+export async function createGameSession(gameId: number): Promise<string | null> {
   try {
     const supabase = await getSupabaseClient();
+    const sessionId = `s_${Date.now().toString(36)}_${crypto.randomUUID().replace(/-/g, "")}`;
     const { error } = await supabase.from("game_analytics").insert({
       game_id: gameId,
       session_id: sessionId,
-      duration_seconds: durationSeconds,
-      completed,
-      score: score || null,
+      duration_seconds: 0,
+      completed: false,
     });
     if (error) throw error;
-    return true;
+    // Play count is best-effort; a failure here must not block the session.
+    incrementGamePlayCount(gameId).catch(() => {});
+    return sessionId;
   } catch (error) {
-    console.warn("Failed to save game analytics:", error);
+    console.warn("Could not create game session:", error);
+    return null;
+  }
+}
+
+export async function getGameSession(sessionId: string): Promise<PlaySessionRow | null> {
+  try {
+    const supabase = await getSupabaseClient();
+    const { data, error } = await supabase
+      .from("game_analytics")
+      .select("session_id, game_id, score, created_at")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return {
+      sessionId: data.session_id,
+      gameId: Number(data.game_id),
+      score: data.score === null ? null : Number(data.score),
+      createdAt: new Date(data.created_at),
+    };
+  } catch (error) {
+    console.warn(`Could not read session ${sessionId}:`, error);
+    return null;
+  }
+}
+
+/** Attach the final score to a session. Fails if it was already claimed. */
+export async function finalizeGameSession(
+  sessionId: string,
+  score: number,
+  playerName: string,
+  durationSeconds: number
+): Promise<boolean> {
+  try {
+    const supabase = await getSupabaseClient();
+    const { data, error } = await supabase
+      .from("game_analytics")
+      .update({ score, player_name: playerName, duration_seconds: durationSeconds, completed: true })
+      .eq("session_id", sessionId)
+      .is("score", null)
+      .select("id");
+    if (error) throw error;
+    return (data?.length ?? 0) > 0;
+  } catch (error) {
+    console.warn(`Could not finalize session ${sessionId}:`, error);
     return false;
   }
 }
 
-export async function queryLeaderboard(gameId: number) {
+export interface LeaderboardEntry {
+  playerName: string;
+  score: number;
+  createdAt: Date;
+}
+
+export async function queryLeaderboard(gameId: number, limit = 10): Promise<LeaderboardEntry[]> {
   return await runQuery(
     async () => {
       const supabase = await getSupabaseClient();
@@ -423,14 +476,10 @@ export async function queryLeaderboard(gameId: number) {
         .not("score", "is", null)
         .not("player_name", "is", null)
         .order("score", { ascending: false })
-        .limit(10);
+        .order("created_at", { ascending: true })
+        .limit(limit);
       if (error) throw error;
-      interface DatabaseScore {
-        player_name: string;
-        score: number | string;
-        created_at: string;
-      }
-      return (data || []).map((d: DatabaseScore) => ({
+      return (data || []).map((d: { player_name: string; score: number | string; created_at: string }) => ({
         playerName: d.player_name,
         score: Number(d.score),
         createdAt: new Date(d.created_at),
@@ -438,53 +487,4 @@ export async function queryLeaderboard(gameId: number) {
     },
     []
   );
-}
-
-export async function updateSessionScoreAndPlayer(sessionId: string, score: number, playerName: string) {
-  try {
-    const supabase = await getSupabaseClient();
-    const { error } = await supabase
-      .from("game_analytics")
-      .update({ score, player_name: playerName })
-      .eq("session_id", sessionId);
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.warn(`Failed to update session score for session ${sessionId}:`, error);
-    return false;
-  }
-}
-
-export async function insertSessionScore(gameId: number, score: number, playerName: string, sessionId?: string) {
-  try {
-    const supabase = await getSupabaseClient();
-    const { error } = await supabase.from("game_analytics").insert({
-      game_id: gameId,
-      score,
-      player_name: playerName,
-      session_id: sessionId || `score-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
-      duration_seconds: 0,
-      completed: true,
-    });
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.warn("Failed to insert session score:", error);
-    return false;
-  }
-}
-
-export async function updateGameAnalyticsDuration(sessionId: string, durationSeconds: number, completed: boolean) {
-  try {
-    const supabase = await getSupabaseClient();
-    const { error } = await supabase
-      .from("game_analytics")
-      .update({ duration_seconds: durationSeconds, completed })
-      .eq("session_id", sessionId);
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.warn(`Failed to update game analytics duration for session ${sessionId}:`, error);
-    return false;
-  }
 }

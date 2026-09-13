@@ -18,7 +18,7 @@ export interface ScoreSubmission {
   score: number;
   playerName: string;
   slug?: string;
-  sessionId?: string;
+  /** Seconds since the session was opened, as measured by the server. */
   durationSeconds?: number;
 }
 
@@ -68,47 +68,4 @@ export function validateScore(input: ScoreSubmission): ValidationResult {
   }
 
   return { ok: true, score, playerName: cleaned.slice(0, 3) };
-}
-
-/**
- * Fixed-window rate limiter, keyed per client.
- *
- * In-memory, so it resets on redeploy and is per-instance rather than global —
- * enough to stop casual scripted spam. Move this to Postgres or Upstash Redis
- * when the site runs on more than one instance.
- */
-const submissions = new Map<string, { count: number; resetAt: number }>();
-
-const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 10;
-
-export function checkRateLimit(key: string): { allowed: boolean; retryAfter: number } {
-  const now = Date.now();
-  const entry = submissions.get(key);
-
-  if (!entry || now > entry.resetAt) {
-    submissions.set(key, { count: 1, resetAt: now + WINDOW_MS });
-
-    // Opportunistic cleanup; the map would otherwise grow with every new client.
-    if (submissions.size > 5_000) {
-      for (const [k, v] of submissions) {
-        if (now > v.resetAt) submissions.delete(k);
-      }
-    }
-    return { allowed: true, retryAfter: 0 };
-  }
-
-  if (entry.count >= MAX_PER_WINDOW) {
-    return { allowed: false, retryAfter: Math.ceil((entry.resetAt - now) / 1000) };
-  }
-
-  entry.count++;
-  return { allowed: true, retryAfter: 0 };
-}
-
-/** Best-effort client identity from proxy headers, for rate-limit keying. */
-export function getClientKey(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return request.headers.get("x-real-ip") ?? "unknown";
 }

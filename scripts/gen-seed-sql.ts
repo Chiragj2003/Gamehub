@@ -14,7 +14,7 @@ const j = (v: unknown) => `${q(JSON.stringify(v))}::jsonb`;
 
 const rows = CATALOG.map(
   (g) =>
-    `  (${g.id}, ${q(g.title)}, ${q(g.slug)}, ${q(g.description)}, ${q(g.category)}, ${q(g.difficulty)}, ${g.rating}, ${g.plays}, NULL, ${q(`/games/${g.slug}/embed`)}, ${j(g.controls)}, ${j(g.rules)})`
+    `  (${g.id}, ${q(g.title)}, ${q(g.slug)}, ${q(g.description)}, ${q(g.category)}, ${q(g.difficulty)}, ${g.rating}, ${g.plays}, NULL, NULL, ${j(g.controls)}, ${j(g.rules)}, ${g.maxScore})`
 ).join(",\n");
 
 const keep = CATALOG.map((g) => q(g.slug)).join(", ");
@@ -26,7 +26,7 @@ const block = `-- 5. Seed Games Catalog
 -- them (ON DELETE CASCADE) so the leaderboards and the home page stay in sync.
 DELETE FROM public.games WHERE slug NOT IN (${keep});
 
-INSERT INTO public.games (id, title, slug, description, category, difficulty, rating, plays, thumbnail_url, iframe_url, controls_json, rules_json)
+INSERT INTO public.games (id, title, slug, description, category, difficulty, rating, plays, thumbnail_url, iframe_url, controls_json, rules_json, max_score)
 VALUES
 ${rows}
 ON CONFLICT (slug) DO UPDATE
@@ -38,6 +38,7 @@ SET title = EXCLUDED.title,
     iframe_url = EXCLUDED.iframe_url,
     controls_json = EXCLUDED.controls_json,
     rules_json = EXCLUDED.rules_json,
+    max_score = EXCLUDED.max_score,
     updated_at = TIMEZONE('utc'::text, NOW());
 
 -- Keep the identity sequence ahead of the fixed ids above.

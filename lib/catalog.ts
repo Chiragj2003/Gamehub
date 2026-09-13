@@ -4,7 +4,7 @@
  * Single source of truth for what the site offers: the database seed, the
  * offline fallback, the embed router and the score validator all derive from
  * this list. To add a game, add an entry here, build the component in
- * components/games/, and register it in GameEmbedClient.
+ * components/games/, and register it in components/GameRenderer.tsx.
  */
 
 export interface CatalogGame {
@@ -50,7 +50,7 @@ export const CATALOG: CatalogGame[] = [
     title: "Pong",
     slug: "pong",
     description:
-      "The original paddle duel. Play the CPU, or grab a friend for a two-player match on one keyboard. First to 11 wins.",
+      "The original paddle duel. Play the CPU, share a keyboard with a friend, or create a room code and play someone online. First to 11 wins.",
     category: "Retro",
     difficulty: "Easy",
     rating: 4.6,
@@ -59,6 +59,7 @@ export const CATALOG: CatalogGame[] = [
       "vs CPU": "Arrow keys or W / S",
       "2 player (left)": "W / S",
       "2 player (right)": "Arrow Up / Down, or drag on touch",
+      online: "Create a room, share the 4-letter code",
       pause: "P or Esc",
     },
     rules: [
@@ -74,7 +75,7 @@ export const CATALOG: CatalogGame[] = [
     title: "Tetris",
     slug: "tetris",
     description:
-      "Stack falling tetrominoes and clear complete lines. Standard 7-bag piece order, wall kicks, lock delay, ghost piece and next-piece preview, exactly as a modern Tetris should feel.",
+      "Stack falling tetrominoes and clear complete lines. Full SRS rotation with wall kicks and T-spins, 7-bag piece order, hold, lock delay, ghost piece and next-piece preview.",
     category: "Puzzle",
     difficulty: "Medium",
     rating: 4.9,
@@ -84,11 +85,13 @@ export const CATALOG: CatalogGame[] = [
       rotate: "Up",
       "soft drop": "Down",
       "hard drop": "Space",
+      hold: "C or Shift",
       touch: "Tap left / right thirds to move, middle to rotate",
       pause: "P or Esc",
     },
     rules: [
       "Complete a horizontal line to clear it. Clearing several at once scores more.",
+      "T-spins score extra: rotate a T into a slot so three corners are blocked.",
       "Every 10 lines raises the level and the fall speed.",
       "The game ends when a new piece has no room to spawn.",
     ],

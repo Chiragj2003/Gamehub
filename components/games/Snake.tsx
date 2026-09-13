@@ -101,6 +101,13 @@ export const ClassicSnake: React.FC<GameProps> = ({ onGameOver }) => {
     update: (dt) => {
       const s = stateRef.current;
       const io = input.current;
+      // Report once, on the first tick after the run ended. This sits above
+      // every early return so it cannot be skipped by whichever path set `over`.
+      if (s.over && !s.reported) {
+        s.reported = true;
+        const final = s.score;
+        setTimeout(() => onGameOverRef.current(final), 1200);
+      }
       if (!io || s.over) return;
 
       if (!s.started) {
@@ -150,12 +157,6 @@ export const ClassicSnake: React.FC<GameProps> = ({ onGameOver }) => {
         s.food = placeFood(s.snake);
       } else {
         s.snake.pop();
-      }
-
-      if (s.over && !s.reported) {
-        s.reported = true;
-        const final = s.score;
-        setTimeout(() => onGameOverRef.current(final), 1200);
       }
     },
 

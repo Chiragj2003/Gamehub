@@ -24,8 +24,8 @@ Every game runs at the same speed on every screen, works on phones and tablets w
 | Game | Controls | What you're doing |
 |------|----------|-------------------|
 | **Snake** | Arrows / WASD · swipe | Eat, grow, don't crash. Speeds up with every pellet. |
-| **Pong** | W/S or arrows · drag | First to 11 vs. the CPU — or **2 Player** on one keyboard, W/S vs. arrows. |
-| **Tetris** | ← → move · ↑ rotate · ↓ soft drop · Space hard drop · tap on touch | 7-bag piece order, wall kicks, lock delay, ghost piece, next-piece preview. |
+| **Pong** | W/S or arrows · drag | First to 11 vs. the CPU, **2 Player** on one keyboard, or **Online** — create a room, share the 4-letter code. |
+| **Tetris** | ← → move · ↑/X rotate · Z rotate back · ↓ soft drop · Space hard drop · C hold · tap on touch | Full SRS rotation with wall kicks and T-spin scoring, 7-bag order, hold, lock delay, ghost, next preview. |
 | **Flappy Bird** | Space / tap | Thread the gaps. Pipes speed up every five. |
 | **Breakout** | ← → / mouse / drag · Space or tap to launch | Clear the bricks. Each level adds rows and speed; top rows go two-hit from level 2. |
 | **Asteroids** | ← → turn · ↑ thrust · Space fire · hold-drag on touch | Split the rocks, survive the waves. Small rocks are fast and worth the most. |
@@ -38,8 +38,8 @@ Every game runs at the same speed on every screen, works on phones and tablets w
 
 ## Leaderboards and your library
 
-- **Leaderboards** are per-game, top 10. Scores are validated server-side — anything impossible for the game or the time played is rejected, and submissions are rate-limited — so what you see is real runs.
-- **My Library** keeps the games you've saved. Sign in with email to sync across devices; without an account it stays on the device you're using.
+- **Leaderboards** are per-game, top 10. Every run opens a server-side session when you press Play; a score can only be attached to that session, the server measures the play time itself, and anything impossible for the game or the time is rejected. Submissions are rate-limited. Your own best on this device is shown separately, never mixed into the global board.
+- **My Library** keeps the games you've saved. Sign in with email and it follows your account across devices; anything you saved before signing in is merged in. Without an account it stays on the device.
 - Every score is also saved locally on your device first, so a dropped connection never loses a run.
 
 ---
@@ -56,12 +56,14 @@ cp .env.example .env.local   # add your Supabase URL + anon key
 npm run dev
 ```
 
-The site works without a database — it falls back to the built-in catalog — but leaderboards and accounts need Supabase. Run [`supabase.sql`](supabase.sql) in your project's SQL editor to create the tables, policies, and seed the games.
+The site works without a database — it falls back to the built-in catalog — but leaderboards and accounts need Supabase. Run [`supabase.sql`](supabase.sql) in your project's SQL editor to create the tables, policies, and seed the games. Online Pong uses Supabase Realtime (on by default). Optional: set the Upstash variables in `.env.example` for rate limits shared across serverless instances.
+
+**Before every push, run `npm run verify`.** It typechecks, lints, and builds with `.env.local` hidden and a clean `.next` — the same conditions as a Vercel Preview deploy.
 
 ### Game engine — [`lib/game-engine/`](lib/game-engine/)
 
 - **`useGameLoop`** — fixed-timestep simulation. Games advance in exact steps regardless of display refresh rate, so a 144 Hz monitor and a 60 Hz one play identically. Auto-pauses on tab/window blur, caps catch-up after stalls.
-- **`useGameInput`** — keyboard, touch swipe, tap, and pointer resolved to logical actions (`up`, `down`, `left`, `right`, `primary`, `pause`). Direction queue for grid games, press counting so rapid taps don't collapse, raw key access for shared-keyboard two-player, and an event callback for turn-based games.
+- **`useGameInput`** — keyboard, touch swipe, tap, and pointer resolved to logical actions (`up`, `down`, `left`, `right`, `primary`, `pause`). Direction queue for grid games, press counting (`consumePress`, `consumeKey`) so a tap between two ticks is never lost, raw key access for shared-keyboard two-player, and an event callback for turn-based games.
 - **`useGameCanvas`** — device-pixel-ratio backing store so games are sharp on retina and phone screens.
 - **`useLatest`** — ref sync for callbacks the loop reads, compatible with the React Compiler.
 
@@ -69,10 +71,12 @@ The site works without a database — it falls back to the built-in catalog — 
 
 1. Add an entry to [`lib/catalog.ts`](lib/catalog.ts) — title, slug, controls, rules, and the score ceiling used for validation. This is the single source of truth.
 2. Build `components/games/YourGame.tsx` with the engine hooks. [Snake](components/games/Snake.tsx) is the smallest reference; [Pacman](components/games/Pacman.tsx) shows grid movement and AI.
-3. Register it in [`app/games/[slug]/embed/GameEmbedClient.tsx`](app/games/[slug]/embed/GameEmbedClient.tsx) and export from [`components/games/index.ts`](components/games/index.ts).
-4. Run `npx tsx scripts/gen-seed-sql.ts` to regenerate the SQL seed, then re-run `supabase.sql`.
+3. Register it in [`components/GameRenderer.tsx`](components/GameRenderer.tsx) and export from [`components/games/index.ts`](components/games/index.ts).
+4. Run `npm run seed:sql` to regenerate the SQL seed, then re-run `supabase.sql`.
 
-**Scripts:** `npm run build` · `npm run lint` · `npm run db:seed` · `npx tsx scripts/gen-seed-sql.ts`
+Games render directly in the page inside an error boundary; a crash in one game shows a restart button instead of taking the page down.
+
+**Scripts:** `npm run verify` · `npm run build` · `npm run lint` · `npm run db:seed` · `npm run seed:sql`
 
 ---
 

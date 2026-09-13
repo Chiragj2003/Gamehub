@@ -75,6 +75,13 @@ export const ClassicFlappyBird: React.FC<GameProps> = ({ onGameOver }) => {
     update: (dt) => {
       const s = stateRef.current;
       const io = input.current;
+      // Report once, on the first tick after the run ended. This sits above
+      // every early return so it cannot be skipped by whichever path set `over`.
+      if (s.over && !s.reported) {
+        s.reported = true;
+        const final = s.score;
+        setTimeout(() => onGameOverRef.current(final), 1200);
+      }
       if (!io || s.over || s.paused) return;
 
       if (io.consumePress("primary") || io.consumePress("up")) flap();
@@ -117,12 +124,6 @@ export const ClassicFlappyBird: React.FC<GameProps> = ({ onGameOver }) => {
         }
       }
       s.pipes = s.pipes.filter((p) => p.x + PIPE_W > 0);
-
-      if (s.over && !s.reported) {
-        s.reported = true;
-        const final = s.score;
-        setTimeout(() => onGameOverRef.current(final), 1200);
-      }
     },
 
     render: () => {

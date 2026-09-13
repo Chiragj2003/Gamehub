@@ -1,42 +1,36 @@
 import { NextResponse } from "next/server";
-import { insertGameAnalytics, updateGameAnalyticsDuration } from "@/lib/games";
+import { createGameSession } from "@/lib/db-queries";
+import { rateLimiter, getClientKey } from "@/lib/rate-limit";
 
+/**
+ * Open a play session. The server issues the id and records the start time;
+ * a score can later be attached only to a session created here.
+ */
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { gameId } = body;
-
-    if (!gameId) {
-      return NextResponse.json({ error: "Missing gameId" }, { status: 400 });
+    const limit = await rateLimiter.check("session", getClientKey(request));
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Too many sessions started. Please wait a moment." },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+      );
     }
 
-    const sessionId = `sess-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-    
-    // Log initial session event
-    const logged = await insertGameAnalytics(gameId, sessionId, 0, false);
+    const body = await request.json().catch(() => ({}));
+    const gameId = Number(body?.gameId);
+    if (!Number.isInteger(gameId) || gameId <= 0) {
+      return NextResponse.json({ error: "Invalid gameId" }, { status: 400 });
+    }
 
-    return NextResponse.json({ sessionId, logged });
+    const sessionId = await createGameSession(gameId);
+    if (!sessionId) {
+      return NextResponse.json({ error: "Could not create session" }, { status: 503 });
+    }
+    return NextResponse.json({ sessionId });
   } catch (error) {
-    console.error("API POST session error:", error);
+    console.error("POST /api/games/session error:", error);
     return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
   }
 }
 
-export async function PUT(request: Request) {
-  try {
-    const body = await request.json();
-    const { sessionId, durationSeconds, completed } = body;
-
-    if (!sessionId || durationSeconds === undefined || completed === undefined) {
-      return NextResponse.json({ error: "Missing required fields (sessionId, durationSeconds, completed)" }, { status: 400 });
-    }
-
-    const updated = await updateGameAnalyticsDuration(sessionId, durationSeconds, completed);
-
-    return NextResponse.json({ updated });
-  } catch (error) {
-    console.error("API PUT session error:", error);
-    return NextResponse.json({ error: "Failed to update session" }, { status: 500 });
-  }
-}
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";

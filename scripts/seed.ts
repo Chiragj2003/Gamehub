@@ -27,7 +27,8 @@ async function seed() {
         rating: g.rating,
         plays: g.plays,
         thumbnailUrl: null,
-        iframeUrl: `/games/${g.slug}/embed`,
+        iframeUrl: null,
+        maxScore: g.maxScore,
         controlsJson: g.controls,
         rulesJson: g.rules,
       })
@@ -40,6 +41,7 @@ async function seed() {
           difficulty: g.difficulty,
           controlsJson: g.controls,
           rulesJson: g.rules,
+          maxScore: g.maxScore,
           updatedAt: new Date(),
         },
       });

@@ -27,16 +27,5 @@ export async function incrementPlayCount(id: number) {
   return await queries.incrementGamePlayCount(id);
 }
 
-// Re-export query bindings for library, analytics, and leaderboards
-export {
-  queryUserLibrary,
-  insertUserGame,
-  deleteUserGame,
-  insertGameAnalytics,
-  queryLeaderboard,
-  updateSessionScoreAndPlayer,
-  insertSessionScore,
-  updateGameAnalyticsDuration,
-  FALLBACK_GAMES
-} from "./db-queries";
+export { queryLeaderboard, FALLBACK_GAMES } from "./db-queries";
 export { type Game } from "./db-queries";

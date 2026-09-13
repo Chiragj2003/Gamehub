@@ -55,9 +55,11 @@ CREATE TABLE IF NOT EXISTS public.games (
   iframe_url TEXT,
   controls_json JSONB DEFAULT '{}'::jsonb NOT NULL,
   rules_json JSONB DEFAULT '[]'::jsonb NOT NULL,
+  max_score INTEGER DEFAULT 100000 NOT NULL, -- ceiling enforced by RLS on score writes
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+ALTER TABLE public.games ADD COLUMN IF NOT EXISTS max_score INTEGER DEFAULT 100000 NOT NULL;
 
 -- Enable RLS for games
 ALTER TABLE public.games ENABLE ROW LEVEL SECURITY;
@@ -66,8 +68,15 @@ ALTER TABLE public.games ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Games are viewable by everyone" ON public.games
   FOR SELECT USING (true);
 
-CREATE POLICY "Authenticated/Service users can modify games" ON public.games
-  FOR ALL USING (true) WITH CHECK (true);
+-- Only the play counter may change through the public API. Everything else
+-- about a game is edited by the service role (which bypasses RLS) via the seed.
+DROP POLICY IF EXISTS "Authenticated/Service users can modify games" ON public.games;
+CREATE POLICY "Public may only bump the play counter" ON public.games
+  FOR UPDATE USING (true)
+  WITH CHECK (true);
+-- Column-level grant enforces that: the anon role can UPDATE plays and nothing else.
+REVOKE UPDATE ON public.games FROM anon, authenticated;
+GRANT UPDATE (plays) ON public.games TO anon, authenticated;
 
 
 -- 3. Create User Games Table (Library)
@@ -113,8 +122,9 @@ CREATE POLICY "Scores and sessions are viewable by everyone" ON public.game_anal
   FOR SELECT USING (true);
 
 -- Anonymous play is supported, so inserting a telemetry row stays open.
-CREATE POLICY "Anyone can log telemetry" ON public.game_analytics
-  FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Anyone can log telemetry" ON public.game_analytics;
+CREATE POLICY "Anyone can open an unscored session" ON public.game_analytics
+  FOR INSERT WITH CHECK (score IS NULL AND player_name IS NULL AND completed = false);
 
 -- A session row may only be completed once, and only while it is fresh.
 --
@@ -123,6 +133,8 @@ CREATE POLICY "Anyone can log telemetry" ON public.game_analytics
 -- scores — straight from the browser, bypassing the API entirely. Restricting
 -- updates to rows that have no score yet makes a submitted score final, and the
 -- 6-hour window stops an old session id being replayed later to inject a score.
+DROP POLICY IF EXISTS "Anyone can update telemetry sessions" ON public.game_analytics;
+DROP POLICY IF EXISTS "Sessions can be finalised once, while recent" ON public.game_analytics;
 CREATE POLICY "Sessions can be finalised once, while recent" ON public.game_analytics
   FOR UPDATE
   USING (
@@ -130,11 +142,19 @@ CREATE POLICY "Sessions can be finalised once, while recent" ON public.game_anal
     AND created_at > NOW() - INTERVAL '6 hours'
   )
   WITH CHECK (
-    score IS NULL OR (score >= 0 AND score <= 1000000)
+    -- A finalised row must carry a bounded score and arcade-style initials.
+    -- The ceiling comes from the game itself, so a bypass that talks to
+    -- Supabase directly is still capped per game, not just at a global max.
+    score IS NOT NULL
+    AND score >= 0
+    AND score <= (SELECT g.max_score FROM public.games g WHERE g.id = game_id)
+    AND player_name ~ '^[A-Z0-9]{1,3}$'
+    AND completed = true
   );
 
 -- Nobody may delete telemetry through the public API; leaderboard history is
 -- append-only. Administrative cleanup runs with the service role, which bypasses RLS.
+DROP POLICY IF EXISTS "No public deletes" ON public.game_analytics;
 CREATE POLICY "No public deletes" ON public.game_analytics
   FOR DELETE USING (false);
 
@@ -152,18 +172,18 @@ CREATE INDEX IF NOT EXISTS game_analytics_session_idx
 -- them (ON DELETE CASCADE) so the leaderboards and the home page stay in sync.
 DELETE FROM public.games WHERE slug NOT IN ('snake', 'pong', 'tetris', 'flappy-bird', 'breakout', 'asteroids', 'space-invaders', 'pacman', '2048', 'dino');
 
-INSERT INTO public.games (id, title, slug, description, category, difficulty, rating, plays, thumbnail_url, iframe_url, controls_json, rules_json)
+INSERT INTO public.games (id, title, slug, description, category, difficulty, rating, plays, thumbnail_url, iframe_url, controls_json, rules_json, max_score)
 VALUES
-  (1, 'Snake', 'snake', 'The retro block-eating serpent, rebuilt. Eat food, grow longer, and keep clear of the walls and your own tail. Every pellet makes the snake a little faster.', 'Arcade', 'Easy', 4.8, 14820, NULL, '/games/snake/embed', '{"move":"Arrow keys / WASD","touch":"Swipe to turn","pause":"P or Esc"}'::jsonb, '["Eat the red pellets to score 10 points and grow one segment.","The snake speeds up with every pellet eaten.","Hitting a wall or your own body ends the run."]'::jsonb),
-  (2, 'Pong', 'pong', 'The original paddle duel. Play the CPU, or grab a friend for a two-player match on one keyboard. First to 11 wins.', 'Retro', 'Easy', 4.6, 11230, NULL, '/games/pong/embed', '{"vs CPU":"Arrow keys or W / S","2 player (left)":"W / S","2 player (right)":"Arrow Up / Down, or drag on touch","pause":"P or Esc"}'::jsonb, '["Return the ball past your opponent to score a point.","Where the ball hits your paddle sets the angle of the return.","First player to 11 points wins the match."]'::jsonb),
-  (3, 'Tetris', 'tetris', 'Stack falling tetrominoes and clear complete lines. Standard 7-bag piece order, wall kicks, lock delay, ghost piece and next-piece preview, exactly as a modern Tetris should feel.', 'Puzzle', 'Medium', 4.9, 18450, NULL, '/games/tetris/embed', '{"move":"Left / Right (hold to auto-shift)","rotate":"Up","soft drop":"Down","hard drop":"Space","touch":"Tap left / right thirds to move, middle to rotate","pause":"P or Esc"}'::jsonb, '["Complete a horizontal line to clear it. Clearing several at once scores more.","Every 10 lines raises the level and the fall speed.","The game ends when a new piece has no room to spawn."]'::jsonb),
-  (4, 'Flappy Bird', 'flappy-bird', 'Tap to flap and thread the bird through the gaps. Deceptively simple, brutally hard. The pipes speed up every five you pass.', 'Arcade', 'Medium', 4.5, 9870, NULL, '/games/flappy-bird/embed', '{"flap":"Space / Up / click / tap","pause":"P or Esc"}'::jsonb, '["Each pipe you pass is one point.","Touching a pipe, the ground, or the ceiling ends the run.","Pipes move faster every five points."]'::jsonb),
-  (5, 'Breakout', 'breakout', 'Smash every brick with a bouncing ball. Each level adds rows and speed, and the top rows start taking two hits from level 2.', 'Arcade', 'Medium', 4.6, 8450, NULL, '/games/breakout/embed', '{"move":"Left / Right, mouse, or drag","launch":"Space / click / tap","pause":"P or Esc"}'::jsonb, '["Bricks score 20 points; the tough ones score 10 on the first hit.","Clearing the board awards a level bonus and a faster ball.","Miss the ball three times and the game is over."]'::jsonb),
-  (6, 'Asteroids', 'asteroids', 'Pilot a lone ship through a field of drifting rocks. Big asteroids split into smaller, faster ones, and every wave adds more of them.', 'Action', 'Hard', 4.7, 7620, NULL, '/games/asteroids/embed', '{"turn":"Left / Right","thrust":"Up","fire":"Space / click","touch":"Hold and drag to steer and thrust, tap to fire","pause":"P or Esc"}'::jsonb, '["Large rocks are 20 points, medium 50, small 100.","Small rocks move fastest; splitting a big one raises the pressure.","You get a short shield after each respawn. Three lives."]'::jsonb),
-  (7, 'Space Invaders', 'space-invaders', 'Hold the line against a descending alien formation. They march faster as their numbers fall, and each wave arrives quicker and angrier than the last.', 'Retro', 'Hard', 4.7, 10240, NULL, '/games/space-invaders/embed', '{"move":"Left / Right, mouse, or drag","fire":"Space / click / tap (hold to auto-fire)","pause":"P or Esc"}'::jsonb, '["Aliens in the back rows are worth more: 40, 30, 20, 10 points.","Your shots can intercept incoming alien fire.","The game ends if the formation reaches your cannon or you lose all three lives."]'::jsonb),
-  (8, 'Pac-Man Style', 'pacman', 'Clear the maze of dots while four ghosts hunt you down. Grab a power pellet to turn the tables and eat them for a rising bonus.', 'Retro', 'Hard', 4.8, 13560, NULL, '/games/pacman/embed', '{"move":"Arrow keys / WASD","touch":"Swipe to turn","pause":"P or Esc"}'::jsonb, '["Dots are 10 points, power pellets 50.","Eating ghosts in one power-up scores 200, 400, 800, 1600.","Clear every dot to advance; ghosts get faster each level."]'::jsonb),
-  (12, '2048', '2048', 'Slide the tiles and merge matching numbers. Reach 2048 and then keep going for a high score. Your best is saved on this device.', 'Puzzle', 'Medium', 4.7, 15320, NULL, '/games/2048/embed', '{"move":"Arrow keys / WASD","touch":"Swipe"}'::jsonb, '["Tiles slide as far as they can; equal tiles that collide merge into one.","Every merge adds the new tile''s value to your score.","The game ends when no move is possible."]'::jsonb),
-  (18, 'Chrome Dino', 'dino', 'The offline runner, online. Jump the cacti, duck under the birds, and see how far you can get before the speed becomes unfair.', 'Arcade', 'Medium', 4.5, 12080, NULL, '/games/dino/embed', '{"jump":"Space / Up / tap","duck":"Down / swipe down","pause":"P or Esc"}'::jsonb, '["Score climbs with distance travelled.","Birds appear after 200 points: low ones must be jumped, high ones ducked.","The run gets faster the longer you survive."]'::jsonb)
+  (1, 'Snake', 'snake', 'The retro block-eating serpent, rebuilt. Eat food, grow longer, and keep clear of the walls and your own tail. Every pellet makes the snake a little faster.', 'Arcade', 'Easy', 4.8, 14820, NULL, NULL, '{"move":"Arrow keys / WASD","touch":"Swipe to turn","pause":"P or Esc"}'::jsonb, '["Eat the red pellets to score 10 points and grow one segment.","The snake speeds up with every pellet eaten.","Hitting a wall or your own body ends the run."]'::jsonb, 5000),
+  (2, 'Pong', 'pong', 'The original paddle duel. Play the CPU, share a keyboard with a friend, or create a room code and play someone online. First to 11 wins.', 'Retro', 'Easy', 4.6, 11230, NULL, NULL, '{"vs CPU":"Arrow keys or W / S","2 player (left)":"W / S","2 player (right)":"Arrow Up / Down, or drag on touch","online":"Create a room, share the 4-letter code","pause":"P or Esc"}'::jsonb, '["Return the ball past your opponent to score a point.","Where the ball hits your paddle sets the angle of the return.","First player to 11 points wins the match."]'::jsonb, 1600),
+  (3, 'Tetris', 'tetris', 'Stack falling tetrominoes and clear complete lines. Full SRS rotation with wall kicks and T-spins, 7-bag piece order, hold, lock delay, ghost piece and next-piece preview.', 'Puzzle', 'Medium', 4.9, 18450, NULL, NULL, '{"move":"Left / Right (hold to auto-shift)","rotate":"Up","soft drop":"Down","hard drop":"Space","hold":"C or Shift","touch":"Tap left / right thirds to move, middle to rotate","pause":"P or Esc"}'::jsonb, '["Complete a horizontal line to clear it. Clearing several at once scores more.","T-spins score extra: rotate a T into a slot so three corners are blocked.","Every 10 lines raises the level and the fall speed.","The game ends when a new piece has no room to spawn."]'::jsonb, 500000),
+  (4, 'Flappy Bird', 'flappy-bird', 'Tap to flap and thread the bird through the gaps. Deceptively simple, brutally hard. The pipes speed up every five you pass.', 'Arcade', 'Medium', 4.5, 9870, NULL, NULL, '{"flap":"Space / Up / click / tap","pause":"P or Esc"}'::jsonb, '["Each pipe you pass is one point.","Touching a pipe, the ground, or the ceiling ends the run.","Pipes move faster every five points."]'::jsonb, 1000),
+  (5, 'Breakout', 'breakout', 'Smash every brick with a bouncing ball. Each level adds rows and speed, and the top rows start taking two hits from level 2.', 'Arcade', 'Medium', 4.6, 8450, NULL, NULL, '{"move":"Left / Right, mouse, or drag","launch":"Space / click / tap","pause":"P or Esc"}'::jsonb, '["Bricks score 20 points; the tough ones score 10 on the first hit.","Clearing the board awards a level bonus and a faster ball.","Miss the ball three times and the game is over."]'::jsonb, 20000),
+  (6, 'Asteroids', 'asteroids', 'Pilot a lone ship through a field of drifting rocks. Big asteroids split into smaller, faster ones, and every wave adds more of them.', 'Action', 'Hard', 4.7, 7620, NULL, NULL, '{"turn":"Left / Right","thrust":"Up","fire":"Space / click","touch":"Hold and drag to steer and thrust, tap to fire","pause":"P or Esc"}'::jsonb, '["Large rocks are 20 points, medium 50, small 100.","Small rocks move fastest; splitting a big one raises the pressure.","You get a short shield after each respawn. Three lives."]'::jsonb, 100000),
+  (7, 'Space Invaders', 'space-invaders', 'Hold the line against a descending alien formation. They march faster as their numbers fall, and each wave arrives quicker and angrier than the last.', 'Retro', 'Hard', 4.7, 10240, NULL, NULL, '{"move":"Left / Right, mouse, or drag","fire":"Space / click / tap (hold to auto-fire)","pause":"P or Esc"}'::jsonb, '["Aliens in the back rows are worth more: 40, 30, 20, 10 points.","Your shots can intercept incoming alien fire.","The game ends if the formation reaches your cannon or you lose all three lives."]'::jsonb, 50000),
+  (8, 'Pac-Man Style', 'pacman', 'Clear the maze of dots while four ghosts hunt you down. Grab a power pellet to turn the tables and eat them for a rising bonus.', 'Retro', 'Hard', 4.8, 13560, NULL, NULL, '{"move":"Arrow keys / WASD","touch":"Swipe to turn","pause":"P or Esc"}'::jsonb, '["Dots are 10 points, power pellets 50.","Eating ghosts in one power-up scores 200, 400, 800, 1600.","Clear every dot to advance; ghosts get faster each level."]'::jsonb, 100000),
+  (12, '2048', '2048', 'Slide the tiles and merge matching numbers. Reach 2048 and then keep going for a high score. Your best is saved on this device.', 'Puzzle', 'Medium', 4.7, 15320, NULL, NULL, '{"move":"Arrow keys / WASD","touch":"Swipe"}'::jsonb, '["Tiles slide as far as they can; equal tiles that collide merge into one.","Every merge adds the new tile''s value to your score.","The game ends when no move is possible."]'::jsonb, 200000),
+  (18, 'Chrome Dino', 'dino', 'The offline runner, online. Jump the cacti, duck under the birds, and see how far you can get before the speed becomes unfair.', 'Arcade', 'Medium', 4.5, 12080, NULL, NULL, '{"jump":"Space / Up / tap","duck":"Down / swipe down","pause":"P or Esc"}'::jsonb, '["Score climbs with distance travelled.","Birds appear after 200 points: low ones must be jumped, high ones ducked.","The run gets faster the longer you survive."]'::jsonb, 50000)
 ON CONFLICT (slug) DO UPDATE
 SET title = EXCLUDED.title,
     description = EXCLUDED.description,
@@ -173,6 +193,7 @@ SET title = EXCLUDED.title,
     iframe_url = EXCLUDED.iframe_url,
     controls_json = EXCLUDED.controls_json,
     rules_json = EXCLUDED.rules_json,
+    max_score = EXCLUDED.max_score,
     updated_at = TIMEZONE('utc'::text, NOW());
 
 -- Keep the identity sequence ahead of the fixed ids above.

@@ -68,6 +68,12 @@ export interface GameInput {
    * from the arrow keys, which both map to the same logical actions.
    */
   isKeyDown: (key: string) => boolean;
+  /**
+   * True once per discrete press of a raw key, counted so a tap that lands
+   * between two ticks is not lost. Use for one-shot keys outside the logical
+   * action set (hold, alternate rotate).
+   */
+  consumeKey: (key: string) => boolean;
   clear: () => void;
 }
 
@@ -101,6 +107,7 @@ export function useGameInput(options: GameInputOptions = {}) {
     // on a throttled 30fps tab) must yield two moves, not one.
     const pressed = new Map<GameAction, number>();
     const rawKeys = new Set<string>();
+    const rawPressed = new Map<string, number>();
     const directionQueue: GameAction[] = [];
     let pointerPos: { x: number; y: number } | null = null;
 
@@ -115,6 +122,7 @@ export function useGameInput(options: GameInputOptions = {}) {
     const onKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
       if (SWALLOWED.has(key)) e.preventDefault();
+      if (!e.repeat && !rawKeys.has(key)) rawPressed.set(key, (rawPressed.get(key) ?? 0) + 1);
       rawKeys.add(key);
 
       const action = KEY_MAP[key];
@@ -149,6 +157,7 @@ export function useGameInput(options: GameInputOptions = {}) {
       held.clear();
       pressed.clear();
       rawKeys.clear();
+      rawPressed.clear();
     };
     window.addEventListener("blur", onBlur);
 
@@ -243,10 +252,19 @@ export function useGameInput(options: GameInputOptions = {}) {
       shiftDirection: () => directionQueue.shift() ?? null,
       pointer: () => pointerPos,
       isKeyDown: (key) => rawKeys.has(key.toLowerCase()),
+      consumeKey: (key) => {
+        const k = key.toLowerCase();
+        const n = rawPressed.get(k) ?? 0;
+        if (n === 0) return false;
+        if (n === 1) rawPressed.delete(k);
+        else rawPressed.set(k, n - 1);
+        return true;
+      },
       clear: () => {
         held.clear();
         pressed.clear();
         rawKeys.clear();
+        rawPressed.clear();
         directionQueue.length = 0;
       },
     };

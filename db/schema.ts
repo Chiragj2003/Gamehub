@@ -13,6 +13,7 @@ export const games = pgTable("games", {
   iframeUrl: text("iframe_url"),
   controlsJson: jsonb("controls_json").default({}).notNull(), // e.g. { "ArrowUp": "Move Up" }
   rulesJson: jsonb("rules_json").default([]).notNull(), // e.g. ["Rule 1", "Rule 2"]
+  maxScore: integer("max_score").default(100000).notNull(), // ceiling enforced by RLS on score writes
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

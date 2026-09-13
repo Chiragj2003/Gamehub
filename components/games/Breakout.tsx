@@ -108,6 +108,13 @@ export const ClassicBreakout: React.FC<GameProps> = ({ onGameOver }) => {
     update: (dt) => {
       const s = stateRef.current;
       const io = input.current;
+      // Report once, on the first tick after the run ended. This sits above
+      // every early return so it cannot be skipped by whichever path set `over`.
+      if (s.over && !s.reported) {
+        s.reported = true;
+        const final = s.score;
+        setTimeout(() => onGameOverRef.current(final), 1200);
+      }
       if (!io || s.over || s.paused) return;
 
       if (s.banner > 0) {
@@ -213,12 +220,6 @@ export const ClassicBreakout: React.FC<GameProps> = ({ onGameOver }) => {
         s.bricks = buildBricks(s.level);
         s.stuck = true;
         s.banner = 1.5;
-      }
-
-      if (s.over && !s.reported) {
-        s.reported = true;
-        const final = s.score;
-        setTimeout(() => onGameOverRef.current(final), 1200);
       }
     },
 
