@@ -4,8 +4,9 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { CATALOG } from "./catalog";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase/config";
+import { timeoutFetch, databaseBreaker } from "./supabase/fetch";
 
-const publicSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const publicSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { fetch: timeoutFetch } });
 
 export interface Game {
   id: number;
@@ -91,11 +92,17 @@ function mapGame(g: DatabaseGame): Game {
   };
 }
 
-// Helper to catch database connection/query errors and fall back gracefully
+// Run a query with a fallback. A failure trips the breaker so the next
+// queries within the cooldown return their fallback at once instead of each
+// waiting on a request that is going to time out.
 async function runQuery<T>(queryFn: () => Promise<T>, fallbackValue: T): Promise<T> {
+  if (databaseBreaker.isOpen()) return fallbackValue;
   try {
-    return await queryFn();
+    const result = await queryFn();
+    databaseBreaker.reset();
+    return result;
   } catch (error) {
+    databaseBreaker.trip();
     console.warn("Supabase query failed, returning fallback data. Error:", error);
     return fallbackValue;
   }
@@ -104,7 +111,7 @@ async function runQuery<T>(queryFn: () => Promise<T>, fallbackValue: T): Promise
 // ----------------- GRAPHQL QUERY DRIVER -----------------
 
 async function fetchGamesGraphQL(): Promise<Game[]> {
-  const res = await fetch(`${SUPABASE_URL}/graphql/v1`, {
+  const res = await timeoutFetch(`${SUPABASE_URL}/graphql/v1`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -149,7 +156,7 @@ async function fetchGamesGraphQL(): Promise<Game[]> {
 }
 
 async function fetchGameBySlugGraphQL(slug: string): Promise<Game | null> {
-  const res = await fetch(`${SUPABASE_URL}/graphql/v1`, {
+  const res = await timeoutFetch(`${SUPABASE_URL}/graphql/v1`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -310,6 +317,7 @@ export async function querySearchGames(searchQuery: string) {
 }
 
 export async function incrementGamePlayCount(id: number) {
+  if (databaseBreaker.isOpen()) return false;
   try {
     const supabase = await getSupabaseClient();
     
@@ -328,6 +336,7 @@ export async function incrementGamePlayCount(id: number) {
     if (updateError) throw updateError;
     return true;
   } catch (error) {
+    databaseBreaker.trip();
     console.warn(`Could not increment play count for game ID ${id}:`, error);
     return false;
   }
@@ -351,6 +360,7 @@ export async function queryUserLibraryIds(userId: string): Promise<number[]> {
 }
 
 export async function insertUserGame(userId: string, gameId: number): Promise<boolean> {
+  if (databaseBreaker.isOpen()) return false;
   try {
     const supabase = await getSupabaseClient();
     // Upsert on the (user, game) unique key so a double-tap is harmless.
@@ -360,12 +370,14 @@ export async function insertUserGame(userId: string, gameId: number): Promise<bo
     if (error) throw error;
     return true;
   } catch (error) {
+    databaseBreaker.trip();
     console.warn("Failed to save game to library:", error);
     return false;
   }
 }
 
 export async function deleteUserGame(userId: string, gameId: number): Promise<boolean> {
+  if (databaseBreaker.isOpen()) return false;
   try {
     const supabase = await getSupabaseClient();
     const { error } = await supabase
@@ -376,6 +388,7 @@ export async function deleteUserGame(userId: string, gameId: number): Promise<bo
     if (error) throw error;
     return true;
   } catch (error) {
+    databaseBreaker.trip();
     console.warn("Failed to delete game from library:", error);
     return false;
   }
@@ -395,6 +408,7 @@ export interface PlaySessionRow {
  * time, so neither can be forged by the client. Also counts the play.
  */
 export async function createGameSession(gameId: number): Promise<string | null> {
+  if (databaseBreaker.isOpen()) return null;
   try {
     const supabase = await getSupabaseClient();
     const sessionId = `s_${Date.now().toString(36)}_${crypto.randomUUID().replace(/-/g, "")}`;
@@ -409,12 +423,14 @@ export async function createGameSession(gameId: number): Promise<string | null> 
     incrementGamePlayCount(gameId).catch(() => {});
     return sessionId;
   } catch (error) {
+    databaseBreaker.trip();
     console.warn("Could not create game session:", error);
     return null;
   }
 }
 
 export async function getGameSession(sessionId: string): Promise<PlaySessionRow | null> {
+  if (databaseBreaker.isOpen()) return null;
   try {
     const supabase = await getSupabaseClient();
     const { data, error } = await supabase
@@ -431,6 +447,7 @@ export async function getGameSession(sessionId: string): Promise<PlaySessionRow 
       createdAt: new Date(data.created_at),
     };
   } catch (error) {
+    databaseBreaker.trip();
     console.warn(`Could not read session ${sessionId}:`, error);
     return null;
   }
@@ -443,6 +460,7 @@ export async function finalizeGameSession(
   playerName: string,
   durationSeconds: number
 ): Promise<boolean> {
+  if (databaseBreaker.isOpen()) return false;
   try {
     const supabase = await getSupabaseClient();
     const { data, error } = await supabase
@@ -454,6 +472,7 @@ export async function finalizeGameSession(
     if (error) throw error;
     return (data?.length ?? 0) > 0;
   } catch (error) {
+    databaseBreaker.trip();
     console.warn(`Could not finalize session ${sessionId}:`, error);
     return false;
   }

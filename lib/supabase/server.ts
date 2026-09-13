@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config";
+import { timeoutFetch } from "./fetch";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -9,6 +10,7 @@ export async function createClient() {
     SUPABASE_URL,
     SUPABASE_ANON_KEY,
     {
+      global: { fetch: timeoutFetch },
       cookies: {
         getAll() {
           return cookieStore.getAll();
