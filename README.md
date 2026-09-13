@@ -56,7 +56,19 @@ cp .env.example .env.local   # add your Supabase URL + anon key
 npm run dev
 ```
 
-The site works without a database — it falls back to the built-in catalog — but leaderboards and accounts need Supabase. Run [`supabase.sql`](supabase.sql) in your project's SQL editor to create the tables, policies, and seed the games. Online Pong uses Supabase Realtime (on by default). Optional: set the Upstash variables in `.env.example` for rate limits shared across serverless instances.
+The site runs without a database — games, local scores and the device library all work — but **leaderboards, accounts, cross-device library and online Pong need Supabase.**
+
+### Connect your database
+
+1. Create a project at [supabase.com/dashboard](https://supabase.com/dashboard) (free tier is fine).
+2. SQL Editor → New query → paste the whole of [`supabase.sql`](supabase.sql) → Run. Safe to re-run; it creates tables, policies, the stats view, and seeds the ten games.
+3. Project Settings → API: copy the **Project URL** and the **anon / publishable key**.
+4. Vercel → your project → Settings → Environment Variables: set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` for **all** environments (Production, Preview, Development). Redeploy.
+5. Confirm: open `https://your-site/api/health`. It reports whether the database is reachable, how many games it holds, and what to fix if not.
+
+Online Pong uses Supabase Realtime, which is on by default. To offer Google sign-in, enable the Google provider in Supabase → Authentication → Providers, then set `NEXT_PUBLIC_AUTH_GOOGLE=1`. Optional: the Upstash variables in `.env.example` share rate limits across serverless instances.
+
+**Which games do people finish?** In the SQL editor: `SELECT * FROM game_stats ORDER BY starts DESC;` — starts, scored runs, completion %, average play time and top score per game.
 
 **Before every push, run `npm run verify`.** It typechecks, lints, and builds with `.env.local` hidden and a clean `.next` — the same conditions as a Vercel Preview deploy.
 

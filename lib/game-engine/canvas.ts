@@ -24,8 +24,21 @@ export function setupCanvas(
 
   canvas.width = Math.round(logicalWidth * dpr);
   canvas.height = Math.round(logicalHeight * dpr);
-  canvas.style.width = "100%";
-  canvas.style.height = "100%";
+
+  // Fit inside the container at the game's own aspect ratio (letterboxed),
+  // never stretched and never overflowing. "100%/100%" here previously let
+  // the canvas keep its intrinsic height inside a shorter flex box, which
+  // clipped the bottom of every game.
+  canvas.style.width = "auto";
+  canvas.style.height = "auto";
+  canvas.style.maxWidth = "100%";
+  canvas.style.maxHeight = "100%";
+  canvas.style.aspectRatio = `${logicalWidth} / ${logicalHeight}`;
+  canvas.style.display = "block";
+
+  // Input mapping needs the logical size, not the DPR-scaled backing store.
+  canvas.dataset.logicalWidth = String(logicalWidth);
+  canvas.dataset.logicalHeight = String(logicalHeight);
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.imageSmoothingEnabled = false; // crisp edges for pixel-style art
@@ -55,7 +68,7 @@ export function drawPauseOverlay(
 
   ctx.fillStyle = "rgba(255,255,255,0.5)";
   ctx.font = "500 16px system-ui, sans-serif";
-  ctx.fillText("Press P or Esc to resume", width / 2, height / 2 + 28);
+  ctx.fillText("Press P, Esc, Space, or tap to resume", width / 2, height / 2 + 28);
   ctx.restore();
 }
 

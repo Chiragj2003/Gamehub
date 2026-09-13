@@ -25,10 +25,10 @@ const JUMP = -760;
 /** Holding jump after the apex lets the fall come sooner, for short hops. */
 const FAST_FALL = 2.2;
 
-const START_SPEED = 330;
-const MAX_SPEED = 720;
+const START_SPEED = 390;
+const MAX_SPEED = 820;
 /** Speed gained per second of survival. */
-const ACCEL = 9;
+const ACCEL = 12;
 
 /** Spawn gap shrinks as speed rises so the screen density stays constant. */
 const SPAWN_MIN = 0.9;
@@ -89,6 +89,12 @@ export const ClassicDino: React.FC<GameProps> = ({ onGameOver }) => {
   });
 
   useGameLoop({
+    // Window blur pauses the loop; latch our own flag so the PAUSED overlay
+    // shows and the player resumes deliberately when focus returns.
+    onPauseChange: (paused) => {
+      const s = stateRef.current;
+      if (paused && s.started && !s.over) s.paused = true;
+    },
     step: 1000 / 120,
     update: (dt) => {
       const s = stateRef.current;
@@ -100,6 +106,9 @@ export const ClassicDino: React.FC<GameProps> = ({ onGameOver }) => {
         const final = s.score;
         setTimeout(() => onGameOverRef.current(final), 1200);
       }
+      // A tap or Space resumes a paused game (touch has no P key). Consuming the
+      // press keeps it from also firing the game's own primary action.
+      if (io && s.paused && !s.over && io.consumePress("primary")) s.paused = false;
       if (!io || s.over || s.paused) return;
 
       if (io.consumePress("primary") || io.consumePress("up")) jump();
@@ -234,7 +243,7 @@ export const ClassicDino: React.FC<GameProps> = ({ onGameOver }) => {
     <canvas
       ref={canvasRef}
       onMouseDown={jump}
-      className="block h-full w-full cursor-pointer touch-none bg-zinc-950"
+      className="cursor-pointer touch-none bg-zinc-950"
       aria-label="Dino runner game"
     />
   );

@@ -370,6 +370,12 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
   });
 
   useGameLoop({
+    // Window blur pauses the loop; latch our own flag so the PAUSED overlay
+    // shows and the player resumes deliberately when focus returns.
+    onPauseChange: (paused) => {
+      const s = stateRef.current;
+      if (paused && !s.over) s.paused = true;
+    },
     step: 1000 / 60,
 
     update: (dt) => {
@@ -382,6 +388,9 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
         const final = s.score;
         setTimeout(() => onGameOverRef.current(final), 1200);
       }
+      // A tap or Space resumes a paused game (touch has no P key). Consuming the
+      // press keeps it from also firing the game's own primary action.
+      if (io && s.paused && !s.over && io.consumePress("primary")) s.paused = false;
       if (!io) return;
 
       if (!s.initialised) {
@@ -606,7 +615,7 @@ export const ClassicTetris: React.FC<GameProps> = ({ onGameOver }) => {
   return (
     <canvas
       ref={canvasRef}
-      className="block h-full w-full touch-none bg-zinc-950"
+      className="touch-none bg-zinc-950"
       aria-label="Tetris game"
     />
   );

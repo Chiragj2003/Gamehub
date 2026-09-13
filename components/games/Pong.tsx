@@ -19,13 +19,13 @@ const PAD_W = 12;
 const PAD_H = 80;
 const PAD_INSET = 10;
 /** Pixels per second — every speed below is per second, not per frame. */
-const PADDLE_SPEED = 420;
-const AI_SPEED = 330;
+const PADDLE_SPEED = 500;
+const AI_SPEED = 390;
 
 const BALL_RADIUS = 8;
-const BALL_START_SPEED = 330;
+const BALL_START_SPEED = 420;
 /** Hard ceiling: above this the ball outruns any human reaction time. */
-const BALL_MAX_SPEED = 780;
+const BALL_MAX_SPEED = 900;
 const BALL_SPEEDUP = 1.04;
 
 const WIN_SCORE = 11;
@@ -72,6 +72,7 @@ function initialState() {
     /** Host-side: the guest's most recent paddle position. */
     guestY: (HEIGHT - PAD_H) / 2,
     netTimer: 0,
+    lastPointerY: -1,
   };
 }
 
@@ -207,6 +208,12 @@ export const ClassicPong: React.FC<GameProps> = ({ onGameOver }) => {
   };
 
   useGameLoop({
+    // Window blur pauses the loop; latch our own flag so the PAUSED overlay
+    // shows and the player resumes deliberately when focus returns.
+    onPauseChange: (paused) => {
+      const s = stateRef.current;
+      if (paused && !s.over) s.paused = true;
+    },
     step: 1000 / 120, // finer step keeps fast-ball collision precise
     update: (dt) => {
       const s = stateRef.current;
@@ -220,6 +227,9 @@ export const ClassicPong: React.FC<GameProps> = ({ onGameOver }) => {
         const final = mine * 100 + (mine >= WIN_SCORE ? 500 : 0);
         setTimeout(() => onGameOverRef.current(final), 1200);
       }
+      // A tap or Space resumes a paused game (touch has no P key). Consuming the
+      // press keeps it from also firing the game's own primary action.
+      if (io && s.paused && !s.over && io.consumePress("primary")) s.paused = false;
       if (!io || s.over || s.paused) return;
 
       const online = modeRef.current === "online";
@@ -228,10 +238,15 @@ export const ClassicPong: React.FC<GameProps> = ({ onGameOver }) => {
       // Online guest: drive only the right paddle, stream it to the host, and
       // ease the rest of the world toward the host's latest snapshot.
       if (online && roleRef.current === "guest") {
-        const p = io.pointer();
-        if (io.isDown("up")) s.p2y -= PADDLE_SPEED * dt;
-        if (io.isDown("down")) s.p2y += PADDLE_SPEED * dt;
-        if (p && io.isDown("primary")) s.p2y = p.y - PAD_H / 2;
+        const up = io.isDown("up");
+        const down = io.isDown("down");
+        if (up) s.p2y -= PADDLE_SPEED * dt;
+        if (down) s.p2y += PADDLE_SPEED * dt;
+        if (!up && !down) {
+          const p = io.pointer();
+          if (p && p.y !== s.lastPointerY) s.p2y = p.y - PAD_H / 2;
+          if (p) s.lastPointerY = p.y;
+        }
         s.p2y = Math.max(0, Math.min(HEIGHT - PAD_H, s.p2y));
 
         s.netTimer += dt;
@@ -262,6 +277,14 @@ export const ClassicPong: React.FC<GameProps> = ({ onGameOver }) => {
       const p1Down = twoPlayer ? io.isKeyDown("s") : io.isDown("down");
       if (p1Up) s.p1y -= PADDLE_SPEED * dt;
       if (p1Down) s.p1y += PADDLE_SPEED * dt;
+      // Against the CPU or online, a mouse or finger also drives the paddle —
+      // only while it is actually moving, so a resting cursor never fights
+      // the keys. In two-player the pointer belongs to the right paddle.
+      if (!twoPlayer && !p1Up && !p1Down) {
+        const p = io.pointer();
+        if (p && p.y !== s.lastPointerY) s.p1y = p.y - PAD_H / 2;
+        if (p) s.lastPointerY = p.y;
+      }
       s.p1y = Math.max(0, Math.min(HEIGHT - PAD_H, s.p1y));
 
       if (online) {
@@ -403,10 +426,10 @@ export const ClassicPong: React.FC<GameProps> = ({ onGameOver }) => {
   });
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative flex h-full w-full items-center justify-center">
       <canvas
         ref={canvasRef}
-        className="block h-full w-full touch-none bg-zinc-950"
+        className="touch-none bg-zinc-950"
         aria-label="Pong game"
       />
       <div className="absolute left-1/2 top-3 flex -translate-x-1/2 gap-1 rounded-full border border-white/10 bg-black/60 p-1 backdrop-blur">

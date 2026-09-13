@@ -94,7 +94,7 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
   }
 
   return (
-    <div className="relative flex aspect-video w-full flex-col overflow-hidden rounded-xl border border-white/5 bg-zinc-950">
+    <div className="relative flex w-full flex-col overflow-hidden rounded-xl border border-white/5 bg-zinc-950 aspect-[4/3] max-h-[78vh] md:aspect-video">
       <div className="relative z-20 flex h-10 items-center justify-between border-b border-white/5 bg-black/60 px-4 text-xs text-zinc-400">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -114,7 +114,9 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
         </div>
       </div>
 
-      <div className="relative flex-1 bg-zinc-950">
+      {/* min-h-0 lets the flex item shrink so the canvas's max-height resolves;
+          without it the canvas keeps its intrinsic size and overflows. */}
+      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-zinc-950">
         <GameErrorBoundary key={runKey} onReset={() => setRunKey((k) => k + 1)}>
           <GameRenderer key={runKey} slug={gameSlug} onGameOver={handleGameOver} />
         </GameErrorBoundary>

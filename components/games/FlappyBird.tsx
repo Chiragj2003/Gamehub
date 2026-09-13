@@ -25,10 +25,10 @@ const MAX_FALL = 700;
 const PIPE_W = 64;
 const PIPE_GAP = 170;
 const PIPE_MIN = 60;
-const PIPE_START_SPEED = 190;
-const PIPE_SPEEDUP = 18; // per 5 pipes
-const PIPE_MAX_SPEED = 360;
-const SPAWN_INTERVAL = 1.55;
+const PIPE_START_SPEED = 250;
+const PIPE_SPEEDUP = 22; // per 5 pipes
+const PIPE_MAX_SPEED = 430;
+const SPAWN_INTERVAL = 1.35;
 
 type Pipe = { x: number; topH: number; passed: boolean };
 
@@ -71,6 +71,12 @@ export const ClassicFlappyBird: React.FC<GameProps> = ({ onGameOver }) => {
   });
 
   useGameLoop({
+    // Window blur pauses the loop; latch our own flag so the PAUSED overlay
+    // shows and the player resumes deliberately when focus returns.
+    onPauseChange: (paused) => {
+      const s = stateRef.current;
+      if (paused && s.started && !s.over) s.paused = true;
+    },
     step: 1000 / 120,
     update: (dt) => {
       const s = stateRef.current;
@@ -82,6 +88,9 @@ export const ClassicFlappyBird: React.FC<GameProps> = ({ onGameOver }) => {
         const final = s.score;
         setTimeout(() => onGameOverRef.current(final), 1200);
       }
+      // A tap or Space resumes a paused game (touch has no P key). Consuming the
+      // press keeps it from also firing the game's own primary action.
+      if (io && s.paused && !s.over && io.consumePress("primary")) s.paused = false;
       if (!io || s.over || s.paused) return;
 
       if (io.consumePress("primary") || io.consumePress("up")) flap();
@@ -189,7 +198,7 @@ export const ClassicFlappyBird: React.FC<GameProps> = ({ onGameOver }) => {
     <canvas
       ref={canvasRef}
       onMouseDown={flap}
-      className="block h-full w-full cursor-pointer touch-none bg-zinc-950"
+      className="cursor-pointer touch-none bg-zinc-950"
       aria-label="Flappy Bird game"
     />
   );

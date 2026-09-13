@@ -24,6 +24,27 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
 
   const supabase = createClient();
 
+  // Shown only once the Google provider is enabled in the Supabase dashboard
+  // and NEXT_PUBLIC_AUTH_GOOGLE=1 is set, so the button never appears in a
+  // state where clicking it would fail.
+  const googleEnabled = process.env.NEXT_PUBLIC_AUTH_GOOGLE === "1";
+
+  const handleGoogle = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(window.location.pathname)}` },
+      });
+      if (error) throw error;
+      // The browser navigates away to Google; nothing more to do here.
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not start Google sign-in.");
+      setLoading(false);
+    }
+  };
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -51,7 +72,12 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
         router.refresh();
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "An authentication error occurred.";
+      const raw = err instanceof Error ? err.message : "An authentication error occurred.";
+      // A dead or unconfigured Supabase project surfaces as a fetch failure;
+      // say what is actually wrong instead of echoing a network stack message.
+      const message = /fetch|network|ENOTFOUND/i.test(raw)
+        ? "Sign-in is unavailable right now — the account service can't be reached. You can still play and save scores on this device."
+        : raw;
       setError(message);
     } finally {
       setLoading(false);
@@ -74,9 +100,31 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
         </DialogHeader>
 
         {error && (
-          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs py-3 px-4 rounded-lg text-center font-semibold animate-pulse">
+          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs py-3 px-4 rounded-lg text-center font-semibold">
             {error}
           </div>
+        )}
+
+        {googleEnabled && (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGoogle}
+              disabled={loading}
+              className="h-11 w-full cursor-pointer rounded-full border-white/15 bg-white text-sm font-bold text-black hover:bg-zinc-200"
+            >
+              <svg viewBox="0 0 24 24" className="mr-2 h-4 w-4" aria-hidden="true">
+                <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.3-1.6 3.8-5.4 3.8-3.3 0-5.9-2.7-5.9-6s2.6-6 5.9-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.3 14.6 2.4 12 2.4 6.7 2.4 2.4 6.7 2.4 12s4.3 9.6 9.6 9.6c5.5 0 9.2-3.9 9.2-9.4 0-.6-.1-1.1-.2-1.6H12z" />
+              </svg>
+              Continue with Google
+            </Button>
+            <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+              <span className="h-px flex-1 bg-white/5" />
+              or with email
+              <span className="h-px flex-1 bg-white/5" />
+            </div>
+          </>
         )}
 
         {success && (

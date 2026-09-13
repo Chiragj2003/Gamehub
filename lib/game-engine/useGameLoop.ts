@@ -33,7 +33,11 @@ export interface GameLoopOptions {
    * queues hundreds of catch-up updates. Default 250ms.
    */
   maxFrameTime?: number;
-  /** Pause automatically when the tab is hidden or the window loses focus. */
+  /**
+   * Pause the simulation when the tab is hidden or the window loses focus, and
+   * resume it on return. Pair with `onPauseChange` so the game sets its own
+   * paused flag on blur and waits for the player to un-pause.
+   */
   pauseOnBlur?: boolean;
   /** Called once per simulation tick with the fixed step in seconds. */
   update: (deltaSeconds: number, handle: GameLoopHandle) => void;
@@ -117,14 +121,18 @@ export function useGameLoop(options: GameLoopOptions, deps: unknown[] = []) {
 
     frameId = requestAnimationFrame(frame);
 
-    const onVisibility = () => {
-      if (document.hidden) setPaused(true);
-    };
+    // Losing focus stops the simulation so a notification or alt-tab never
+    // costs a run. Regaining it restarts the loop — the game itself is told
+    // via onPauseChange and is expected to hold its own "paused" state until
+    // the player resumes, so nothing moves until they are ready.
+    const onVisibility = () => setPaused(document.hidden);
     const onBlur = () => setPaused(true);
+    const onFocus = () => setPaused(false);
 
     if (pauseOnBlur) {
       document.addEventListener("visibilitychange", onVisibility);
       window.addEventListener("blur", onBlur);
+      window.addEventListener("focus", onFocus);
     }
 
     return () => {
@@ -133,6 +141,7 @@ export function useGameLoop(options: GameLoopOptions, deps: unknown[] = []) {
       if (pauseOnBlur) {
         document.removeEventListener("visibilitychange", onVisibility);
         window.removeEventListener("blur", onBlur);
+        window.removeEventListener("focus", onFocus);
       }
       handleRef.current = null;
     };

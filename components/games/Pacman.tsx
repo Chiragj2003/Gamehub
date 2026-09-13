@@ -37,10 +37,10 @@ const PLAYER_SPAWN = { c: 7, r: 5 };
 const POWER_CELLS = new Set(["1,1", "13,1", "1,9", "13,9"]);
 const PLAYER_R = 14;
 
-const PLAYER_SPEED = 135;
-const GHOST_SPEED = 112;
+const PLAYER_SPEED = 152;
+const GHOST_SPEED = 124;
 const GHOST_SPEED_PER_LEVEL = 7;
-const GHOST_SPEED_MAX = 150;
+const GHOST_SPEED_MAX = 165;
 const FRIGHT_SPEED = 68;
 const FRIGHT_TIME = 6.5;
 const FRIGHT_TIME_MIN = 2.5;
@@ -209,6 +209,12 @@ export const ClassicPacman: React.FC<GameProps> = ({ onGameOver }) => {
   };
 
   useGameLoop({
+    // Window blur pauses the loop; latch our own flag so the PAUSED overlay
+    // shows and the player resumes deliberately when focus returns.
+    onPauseChange: (paused) => {
+      const s = stateRef.current;
+      if (paused && s.started && !s.over) s.paused = true;
+    },
     step: 1000 / 120,
     update: (dt) => {
       const s = stateRef.current;
@@ -220,6 +226,9 @@ export const ClassicPacman: React.FC<GameProps> = ({ onGameOver }) => {
         const final = s.score;
         setTimeout(() => onGameOverRef.current(final), 1200);
       }
+      // A tap or Space resumes a paused game (touch has no P key). Consuming the
+      // press keeps it from also firing the game's own primary action.
+      if (io && s.paused && !s.over && io.consumePress("primary")) s.paused = false;
       if (!io || s.over || s.paused) return;
 
       const queued = io.shiftDirection();
@@ -475,7 +484,7 @@ export const ClassicPacman: React.FC<GameProps> = ({ onGameOver }) => {
   return (
     <canvas
       ref={canvasRef}
-      className="block h-full w-full touch-none bg-zinc-950"
+      className="touch-none bg-zinc-950"
       aria-label="Pac-Man style game"
     />
   );

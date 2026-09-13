@@ -169,14 +169,14 @@ export function useGameInput(options: GameInputOptions = {}) {
     const toCanvasCoords = (clientX: number, clientY: number) => {
       if (!el) return { x: clientX, y: clientY };
       const rect = el.getBoundingClientRect();
-      const canvas = el as HTMLCanvasElement;
-      // Canvas is drawn at a fixed internal resolution but displayed scaled,
-      // so pointer coordinates must be mapped back into that space.
-      const scaleX = (canvas.width || rect.width) / rect.width;
-      const scaleY = (canvas.height || rect.height) / rect.height;
+      // Map into the game's logical space. The backing store is scaled by
+      // devicePixelRatio, so canvas.width is the wrong divisor on any HiDPI
+      // screen; setupCanvas records the logical size for exactly this.
+      const logicalW = Number(el.dataset.logicalWidth) || rect.width;
+      const logicalH = Number(el.dataset.logicalHeight) || rect.height;
       return {
-        x: (clientX - rect.left) * scaleX,
-        y: (clientY - rect.top) * scaleY,
+        x: ((clientX - rect.left) / rect.width) * logicalW,
+        y: ((clientY - rect.top) / rect.height) * logicalH,
       };
     };
 

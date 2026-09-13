@@ -165,6 +165,36 @@ CREATE INDEX IF NOT EXISTS game_analytics_session_idx
   ON public.game_analytics (session_id);
 
 
+-- 4b. Per-game stats view: which games people start, finish, and abandon.
+--
+--   SELECT * FROM public.game_stats ORDER BY starts DESC;
+--
+-- "starts" counts sessions opened, "scored" counts sessions that ended with a
+-- submitted score, and the durations come from server-measured play time.
+CREATE OR REPLACE VIEW public.game_stats AS
+SELECT
+  g.id,
+  g.slug,
+  g.title,
+  g.plays                                                   AS lifetime_plays,
+  COUNT(a.id)                                               AS starts,
+  COUNT(a.id) FILTER (WHERE a.score IS NOT NULL)            AS scored,
+  ROUND(
+    100.0 * COUNT(a.id) FILTER (WHERE a.score IS NOT NULL)
+    / NULLIF(COUNT(a.id), 0), 1
+  )                                                         AS scored_pct,
+  ROUND(AVG(a.duration_seconds) FILTER (WHERE a.score IS NOT NULL))
+                                                            AS avg_seconds_when_scored,
+  MAX(a.score)                                              AS top_score,
+  COUNT(a.id) FILTER (WHERE a.created_at > NOW() - INTERVAL '7 days')
+                                                            AS starts_last_7d
+FROM public.games g
+LEFT JOIN public.game_analytics a ON a.game_id = g.id
+GROUP BY g.id, g.slug, g.title, g.plays;
+
+GRANT SELECT ON public.game_stats TO anon, authenticated;
+
+
 -- 5. Seed Games Catalog
 -- GENERATED from lib/catalog.ts by scripts/gen-seed-sql.ts. Do not edit by hand.
 
