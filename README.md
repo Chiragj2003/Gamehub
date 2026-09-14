@@ -1,6 +1,6 @@
 # Game Hub
 
-**Ten classic arcade and puzzle games, rebuilt for the browser. No downloads, no ads, no sign-up required — open the site and play.**
+**Eleven classic games, rebuilt for the browser. No downloads, no ads, no sign-up required — open the site and play.**
 
 Every game runs at the same speed on every screen, works on phones and tablets with touch controls, pauses when you switch tabs, and posts your high scores to a per-game leaderboard.
 
@@ -35,6 +35,7 @@ Every game runs at the same speed on every screen, works on phones and tablets w
 | **Pac-Man Style** | Arrows / WASD · swipe | Four ghosts with real chase AI. Power pellets flip it: 200, 400, 800, 1600. |
 | **2048** | Arrows / WASD · swipe | Merge to 2048, then keep going. Best score saved on your device. |
 | **Chrome Dino** | Space / tap jump · ↓ / swipe-down duck | Jump the cacti, duck the birds. Speed never stops climbing. |
+| **Pen Fight** | Drag back from a pen and release · ← → aim · ↑ ↓ power · Space flick · Shift switch pen | The school-desk game in 3D. Knock the other side's pens off the edge. Seven pens with their own weight, speed, grip and bounce. **vs CPU** for the leaderboard (rounds get harder), **2 Player** pass-and-play (the camera swings to whoever's up), or **Online** with a 4-letter room code. |
 
 ---
 
@@ -51,7 +52,7 @@ Every game runs at the same speed on every screen, works on phones and tablets w
 
 Only read on if you want to run or modify the code.
 
-**Stack:** Next.js 16 (App Router), React 19, TypeScript, Tailwind v4, Supabase (Postgres + Auth). Every game is hand-written `<canvas>` (2048 is DOM) on a small shared engine — no game framework.
+**Stack:** Next.js 16 (App Router), React 19, TypeScript, Tailwind v4, Supabase (Postgres + Auth). Every game is hand-written `<canvas>` (2048 is DOM) on a small shared engine — no game framework. Pen Fight is the exception: it renders with Three.js (loaded only on its page) over its own rigid-body physics in `components/games/penfight/`.
 
 **Design system:** every colour is a CSS custom property in [`app/globals.css`](app/globals.css) (`--bg`, `--surface`, `--ink`, `--brand`, per-category and per-difficulty accents), with light as the base and `[data-theme="dark"]` overriding. Tailwind utilities read them (`bg-page`, `text-ink`, `border-line`, `text-cat-arcade`…). Glass surfaces are the `.glass`, `.glass-strong`, `.glass-card` utilities; CTAs are `.btn-glow` / `.btn-quiet`. The game canvases are deliberately dark in both themes. The theme is set before first paint by an inline script (`lib/theme.ts`).
 
@@ -66,12 +67,12 @@ The site runs without a database — games, local scores and the device library 
 ### Connect your database
 
 1. Create a project at [supabase.com/dashboard](https://supabase.com/dashboard) (free tier is fine).
-2. SQL Editor → New query → paste the whole of [`supabase.sql`](supabase.sql) → Run. Safe to re-run; it creates tables, policies, the stats view, and seeds the ten games.
+2. SQL Editor → New query → paste the whole of [`supabase.sql`](supabase.sql) → Run. Safe to re-run; it creates tables, policies, the stats view, and seeds the eleven games.
 3. Project Settings → API: copy the **Project URL** and the **anon / publishable key**.
 4. Vercel → your project → Settings → Environment Variables: set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` for **all** environments (Production, Preview, Development), plus `SUPABASE_SERVICE_ROLE_KEY` (server-only; it powers account deletion). Redeploy.
 5. Confirm: open `https://your-site/api/health`. It reports whether the database is reachable, how many games it holds, and what to fix if not.
 
-Online Pong uses Supabase Realtime, which is on by default. To offer Google sign-in, enable the Google provider in Supabase → Authentication → Providers, then set `NEXT_PUBLIC_AUTH_GOOGLE=1`. Optional: the Upstash variables in `.env.example` share rate limits across serverless instances.
+Online Pong and online Pen Fight use Supabase Realtime, which is on by default. To offer Google sign-in, enable the Google provider in Supabase → Authentication → Providers, then set `NEXT_PUBLIC_AUTH_GOOGLE=1`. Optional: the Upstash variables in `.env.example` share rate limits across serverless instances.
 
 **Which games do people finish?** In the SQL editor: `SELECT * FROM game_stats ORDER BY starts DESC;` — starts, scored runs, completion %, average play time and top score per game.
 

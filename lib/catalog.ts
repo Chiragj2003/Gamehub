@@ -245,6 +245,33 @@ export const CATALOG: CatalogGame[] = [
     maxScore: 50_000,
     maxRate: 80,
   },
+  {
+    id: 19,
+    title: "Pen Fight",
+    slug: "pen-fight",
+    description:
+      "The school-desk classic in full 3D. Flick your pens into the other side's and knock them off the edge. Seven pens with their own weight, speed and grip; play the CPU, pass the phone to a friend, or share a room code and play online.",
+    category: "Action",
+    difficulty: "Medium",
+    rating: 4.9,
+    plays: 0,
+    controls: {
+      flick: "Drag back from your pen, release",
+      aim: "Left / Right",
+      power: "Up / Down",
+      "flick (keys)": "Space",
+      "switch pen": "Shift, or tap another pen",
+      pause: "P or Esc",
+    },
+    rules: [
+      "A pen whose centre crosses the desk edge falls off. Knock theirs off; keep yours on.",
+      "Knocking off a pen scores 100, and each extra pen in the same flick scores 50 more.",
+      "vs CPU: clear its pens to win the round and earn a bonus. Lose all of yours and it is over.",
+      "Every pen is different — heavy pens shove, light pens fly, grippy pens stop short.",
+    ],
+    maxScore: 100_000,
+    maxRate: 250,
+  },
 ];
 
 export const CATALOG_BY_SLUG = new Map(CATALOG.map((g) => [g.slug, g]));

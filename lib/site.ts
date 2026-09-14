@@ -4,7 +4,7 @@
  * NEXT_PUBLIC_SITE_URL once a custom domain is attached.
  */
 export const SITE_NAME = "Game Hub";
-export const SITE_TAGLINE = "Ten classic arcade and puzzle games, rebuilt for the browser. No downloads, no sign-up. Tap and play.";
+export const SITE_TAGLINE = "Eleven classic games, rebuilt for the browser. No downloads, no sign-up. Tap and play.";
 
 export const SITE_URL = (() => {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL;

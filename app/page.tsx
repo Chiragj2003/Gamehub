@@ -27,7 +27,7 @@ export default async function Home() {
             </h1>
 
             <p className="mx-auto mt-6 max-w-xl text-balance text-[17px] leading-relaxed text-ink-2 sm:text-[19px]">
-              Ten classic arcade and puzzle games, rebuilt for the browser. No downloads, no sign-up. Tap and play.
+              Eleven classic games, rebuilt for the browser. No downloads, no sign-up. Tap and play.
             </p>
 
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">

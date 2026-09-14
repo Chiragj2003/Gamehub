@@ -103,7 +103,7 @@ export default function Navbar() {
                     Game<span className="text-brand">Hub</span>
                   </SheetTitle>
                   <SheetDescription className="text-[13px] text-ink-2">
-                    Ten classic games. No downloads.
+                    Eleven classic games. No downloads.
                   </SheetDescription>
                 </SheetHeader>
                 <nav className="flex flex-col gap-1 p-3" aria-label="Menu">

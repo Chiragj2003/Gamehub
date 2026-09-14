@@ -43,7 +43,7 @@ export default function TermsPage() {
           <GlassCard className="space-y-8 p-8 sm:p-10">
             <Section title="What Game Hub is">
               <p>
-                Game Hub is a free website where you can play ten classic arcade and puzzle games in your browser. There
+                Game Hub is a free website where you can play eleven classic arcade, puzzle and desk games in your browser. There
                 is nothing to download, nothing to buy, and no advertising. You can play without an account. An account
                 is optional and only adds a library that follows you between devices.
               </p>

@@ -8,4 +8,5 @@ export { ClassicSpaceInvaders } from "./SpaceInvaders";
 export { ClassicPacman } from "./Pacman";
 export { Classic2048 } from "./Game2048";
 export { ClassicDino } from "./Dino";
+export { ClassicPenFight } from "./PenFight";
 export type { GameProps } from "./types";

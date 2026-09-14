@@ -31,6 +31,7 @@ const GAMES: Record<string, React.ComponentType<GameProps>> = {
   pacman: dynamic(() => import("@/components/games/Pacman").then((m) => m.ClassicPacman), { ssr: false, loading: Loading }),
   "2048": dynamic(() => import("@/components/games/Game2048").then((m) => m.Classic2048), { ssr: false, loading: Loading }),
   dino: dynamic(() => import("@/components/games/Dino").then((m) => m.ClassicDino), { ssr: false, loading: Loading }),
+  "pen-fight": dynamic(() => import("@/components/games/PenFight").then((m) => m.ClassicPenFight), { ssr: false, loading: Loading }),
 };
 
 interface GameRendererProps extends GameProps {
