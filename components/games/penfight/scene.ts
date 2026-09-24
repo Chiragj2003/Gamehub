@@ -126,6 +126,64 @@ function makeWoodTexture(size: number): THREE.CanvasTexture {
   return tex;
 }
 
+/**
+ * The play-area decal: a warm pool of lamp light in the middle, a soft glow
+ * ramp toward the perimeter and a crisp line right on the edge.
+ *
+ * From the player's low angle the drop-off is the whole game and a bare wood
+ * plane gives no cue where it is. Drawn at the desk's own 3:2 proportions so
+ * the band is the same width in centimetres on every side.
+ */
+function makeEdgeDecalTexture(): THREE.CanvasTexture {
+  const h = 256;
+  const w = Math.round(h * (TABLE_W / TABLE_D));
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d")!;
+  const pxPerCm = h / TABLE_D;
+
+  // Glow ramp: several inset rectangles of rising alpha, blurred together.
+  const band = 9 * pxPerCm;
+  ctx.filter = `blur(${Math.round(pxPerCm * 2)}px)`;
+  for (let i = 0; i < 14; i++) {
+    const t = i / 13;
+    const inset = band * t;
+    ctx.strokeStyle = `rgba(255, 233, 196, ${0.006 + t * 0.022})`;
+    ctx.lineWidth = band / 7;
+    ctx.strokeRect(inset, inset, w - inset * 2, h - inset * 2);
+  }
+  ctx.filter = "none";
+
+  // The edge itself: a bright hairline, unmistakable at any camera angle.
+  ctx.strokeStyle = "rgba(255, 244, 222, 0.42)";
+  ctx.lineWidth = Math.max(1.5, pxPerCm * 0.5);
+  ctx.strokeRect(1, 1, w - 2, h - 2);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+/** Soft radial falloff, used for the selection pool under the active pen. */
+function makeRadialGlowTexture(): THREE.CanvasTexture {
+  const size = 128;
+  const c = document.createElement("canvas");
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, "rgba(255,255,255,0.85)");
+  g.addColorStop(0.55, "rgba(255,255,255,0.22)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 function makeVignetteTexture(): THREE.CanvasTexture {
   const size = 256;
   const c = document.createElement("canvas");
@@ -157,6 +215,25 @@ function std(color: string, metalness: number, roughness: number, extra: Partial
 }
 
 /**
+ * The barrel material. Resin and painted pens get a clearcoat: a second
+ * specular layer that puts a tight lamp highlight along the length, which is
+ * what makes a plastic pen look like plastic rather than tinted clay. Metal
+ * barrels skip it — bare metal has no lacquer over it.
+ */
+function barrelMaterial(type: PenType) {
+  const { body } = type.colors;
+  const { metalness, roughness } = type.finish;
+  if (metalness > 0.6) return new THREE.MeshStandardMaterial({ color: body, metalness, roughness });
+  return new THREE.MeshPhysicalMaterial({
+    color: body,
+    metalness,
+    roughness,
+    clearcoat: roughness > 0.45 ? 0.35 : 0.85, // matte bodies keep a duller sheen
+    clearcoatRoughness: 0.12,
+  });
+}
+
+/**
  * Build one pen. Each shape is a handful of primitives along the X axis with
  * the tip at +X and the cap at −X, matching the physics body's `angle`.
  */
@@ -164,7 +241,7 @@ function buildPen(type: PenType, side: Side): THREE.Group {
   const g = new THREE.Group();
   const L = type.halfLen;
   const r = type.radius;
-  const body = std(type.colors.body, type.finish.metalness, type.finish.roughness);
+  const body = barrelMaterial(type);
   const accent = std(type.colors.accent, 0.15, 0.35);
   const tipMat = std(type.colors.tip, 0.85, 0.3);
   const chrome = std("#e5e7eb", 0.95, 0.25);
@@ -265,6 +342,8 @@ export class PenScene {
   private penLayer = new THREE.Group();
   private ring: THREE.Mesh;
   private ringMat: THREE.MeshBasicMaterial;
+  private selectionGlow: THREE.Mesh;
+  private glowMat: THREE.MeshBasicMaterial;
   private arrow = new THREE.Group();
   private arrowShaft: THREE.Mesh;
   private arrowHead: THREE.Mesh;
@@ -308,12 +387,35 @@ export class PenScene {
 
     this.scene.add(this.penLayer);
 
-    this.ringMat = new THREE.MeshBasicMaterial({ color: SIDE_COLORS[0], transparent: true, opacity: 0.6, depthWrite: false });
-    this.ring = new THREE.Mesh(new THREE.RingGeometry(1, 1.35, 48), this.ringMat);
+    this.ringMat = new THREE.MeshBasicMaterial({
+      color: SIDE_COLORS[0],
+      transparent: true,
+      opacity: 0.6,
+      depthWrite: false,
+    });
+    this.ring = new THREE.Mesh(new THREE.RingGeometry(1, 1.18, 64), this.ringMat);
     this.ring.rotation.x = -Math.PI / 2;
     this.ring.position.y = 0.06;
     this.ring.visible = false;
     this.scene.add(this.ring);
+
+    // A glow pool inside the ring: a radial fade, so the marker reads as light
+    // spilling onto the desk rather than a flat decal stuck to it.
+    const glowTex = makeRadialGlowTexture();
+    this.disposables.push(glowTex);
+    this.glowMat = new THREE.MeshBasicMaterial({
+      map: glowTex,
+      color: SIDE_COLORS[0],
+      transparent: true,
+      opacity: 0.3,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this.selectionGlow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.glowMat);
+    this.selectionGlow.rotation.x = -Math.PI / 2;
+    this.selectionGlow.position.y = 0.05;
+    this.selectionGlow.visible = false;
+    this.scene.add(this.selectionGlow);
 
     this.arrowMat = new THREE.MeshBasicMaterial({ color: SIDE_COLORS[0], transparent: true, opacity: 0.85, depthWrite: false });
     const shaftGeo = new THREE.PlaneGeometry(1, 1.1);
@@ -371,6 +473,13 @@ export class PenScene {
     const fill = new THREE.DirectionalLight(0xbfd8ff, 0.5);
     fill.position.set(-40, 50, -60);
     this.scene.add(fill);
+
+    // Rim: low and behind, so every pen carries a bright edge and separates
+    // from the wood instead of sinking into it. The single biggest reason the
+    // pens read as objects on a desk rather than decals painted on it.
+    const rim = new THREE.DirectionalLight(0xfff0d8, 0.85);
+    rim.position.set(-20, 14, -70);
+    this.scene.add(rim);
   }
 
   private buildDesk() {
@@ -393,6 +502,16 @@ export class PenScene {
     bevel.position.y = -0.2;
     bevel.receiveShadow = true;
     this.scene.add(bevel);
+
+    const decal = makeEdgeDecalTexture();
+    this.disposables.push(decal);
+    const decalMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(TABLE_W, TABLE_D),
+      new THREE.MeshBasicMaterial({ map: decal, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    decalMesh.rotation.x = -Math.PI / 2;
+    decalMesh.position.y = 0.03;
+    this.scene.add(decalMesh);
 
     const walnut = new THREE.MeshStandardMaterial({ color: "#3b2416", roughness: 0.7 });
     const apron = new THREE.Mesh(new THREE.BoxGeometry(TABLE_W + 4, 2.6, TABLE_D + 4), walnut);
@@ -524,15 +643,23 @@ export class PenScene {
     // Selection ring pulses under the chosen pen.
     const sel = frame.selectedId !== null ? bodies.find((b) => b.id === frame.selectedId) : undefined;
     if (sel && sel.alive && !sel.falling) {
+      const pulse = Math.sin(this.time * 4);
+      const radius = sel.type.halfLen + 1.6 + pulse * 0.3;
       this.ring.visible = true;
-      this.ring.position.x = sel.x;
-      this.ring.position.z = sel.z;
-      const s = sel.type.halfLen + 1.6 + Math.sin(this.time * 4) * 0.3;
-      this.ring.scale.set(s, s, 1);
+      this.ring.position.set(sel.x, 0.06, sel.z);
+      this.ring.scale.set(radius, radius, 1);
       this.ringMat.color.set(SIDE_COLORS[sel.side]);
-      this.ringMat.opacity = 0.45 + Math.sin(this.time * 4) * 0.15;
+      this.ringMat.opacity = 0.5 + pulse * 0.16;
+
+      this.selectionGlow.visible = true;
+      this.selectionGlow.position.set(sel.x, 0.05, sel.z);
+      const g = radius * 2.6;
+      this.selectionGlow.scale.set(g, g, 1);
+      this.glowMat.color.set(SIDE_COLORS[sel.side]);
+      this.glowMat.opacity = 0.22 + pulse * 0.06;
     } else {
       this.ring.visible = false;
+      this.selectionGlow.visible = false;
     }
 
     const aim = frame.aim;
@@ -548,6 +675,24 @@ export class PenScene {
       this.arrowMat.opacity = 0.45 + aim.power * 0.5;
     } else {
       this.arrow.visible = false;
+    }
+
+    // Friction dust off the tip of anything travelling fast. Costs nothing —
+    // the velocities are already on the bodies — and it sells the speed.
+    if (dt > 0) {
+      for (const b of bodies) {
+        if (!b.alive || b.falling) continue;
+        const speed = Math.hypot(b.vx, b.vz);
+        if (speed < 90 || Math.random() > dt * 40) continue;
+        this.pushParticle({
+          x: b.x + (Math.random() - 0.5) * b.type.halfLen,
+          y: 0.3,
+          z: b.z + (Math.random() - 0.5) * b.type.halfLen,
+          vx: -b.vx * 0.04, vy: 4 + Math.random() * 8, vz: -b.vz * 0.04,
+          life: 0.22 + Math.random() * 0.18, maxLife: 0.4,
+          r: 0.8, g: 0.68, b: 0.5,
+        });
+      }
     }
 
     this.updateParticles(dt);

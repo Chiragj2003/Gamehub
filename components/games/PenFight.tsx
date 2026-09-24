@@ -826,7 +826,6 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
       : "Drag back from a pen and release  ·  ← → aim  ·  ↑ ↓ power  ·  Space flick  ·  Shift switch pen"
     : "";
   const label = (side: Side) => (h ? (h.mode === "cpu" ? (side === 0 ? "You" : "CPU") : h.mode === "local" ? `P${side + 1}` : side === h.mySide ? "You" : "Rival") : "");
-
   return (
     <div ref={containerRef} className="relative h-full w-full select-none overflow-hidden bg-[#0b0a10]">
       <canvas
@@ -841,35 +840,63 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
         aria-label="Pen Fight game"
       />
 
+      {/* Lens vignette. The renderer has no post-processing pass; one CSS
+          gradient buys most of what a cinematic grade would, for nothing. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(120% 90% at 50% 42%, transparent 38%, rgba(6,5,12,0.42) 82%, rgba(6,5,12,0.72) 100%)",
+        }}
+      />
+
       {/* In-game HUD */}
       {h && h.phase === "play" && (
         <>
-          <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3 text-white sm:p-4">
-            <div className="rounded-2xl border border-white/10 bg-black/45 px-3 py-2 backdrop-blur-md">
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2.5 text-white sm:p-4">
+            <div className="pf-panel px-3 py-2 sm:px-3.5">
               {h.mode === "cpu" ? (
                 <>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400">Round {h.round}</div>
-                  <div className="font-mono text-lg font-black leading-tight tabular-nums">{h.points[0].toLocaleString()}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/45 sm:text-[10px]">
+                    Round {h.round}
+                  </div>
+                  <div className="font-mono text-[17px] font-black leading-tight tabular-nums sm:text-xl">
+                    {h.points[0].toLocaleString()}
+                  </div>
                 </>
               ) : (
-                <div className="flex items-center gap-3 font-mono text-sm font-black tabular-nums">
-                  <span style={{ color: SIDE_COLORS[0] }}>{label(0)} {h.points[0]}</span>
-                  <span className="text-zinc-500">·</span>
-                  <span style={{ color: SIDE_COLORS[1] }}>{label(1)} {h.points[1]}</span>
+                <div className="flex items-center gap-2.5 font-mono text-[13px] font-black tabular-nums sm:text-sm">
+                  <span style={{ color: SIDE_COLORS[0] }}>
+                    {label(0)} {h.points[0]}
+                  </span>
+                  <span className="text-white/25">·</span>
+                  <span style={{ color: SIDE_COLORS[1] }}>
+                    {label(1)} {h.points[1]}
+                  </span>
                 </div>
               )}
             </div>
 
-            <div className="flex flex-col items-end gap-2">
-              <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/45 px-3 py-2 backdrop-blur-md">
+            <div className="flex flex-col items-end gap-1.5 sm:gap-2">
+              <div className="pf-panel flex items-center gap-2.5 px-3 py-2 sm:gap-3.5">
                 {([0, 1] as Side[]).map((side) => (
                   <div key={side} className="flex items-center gap-1.5" title={h.penNames[side]}>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-400">{label(side)}</span>
-                    <span className="flex gap-0.5">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/45 sm:text-[10px]">
+                      {label(side)}
+                    </span>
+                    <span className="flex items-center gap-[3px]">
                       {Array.from({ length: Math.max(h.alive[side], 0) }).map((_, i) => (
-                        <span key={i} className="h-3.5 w-1.5 rounded-full" style={{ background: SIDE_COLORS[side] }} />
+                        <span
+                          key={i}
+                          className="block h-3.5 w-[5px] rounded-[2px]"
+                          style={{
+                            background: `linear-gradient(180deg, ${SIDE_COLORS[side]}, color-mix(in srgb, ${SIDE_COLORS[side]} 55%, #000))`,
+                            boxShadow: `0 0 7px color-mix(in srgb, ${SIDE_COLORS[side]} 60%, transparent)`,
+                          }}
+                        />
                       ))}
-                      {h.alive[side] === 0 && <span className="text-[10px] text-zinc-500">none</span>}
+                      {h.alive[side] === 0 && <span className="text-[10px] font-semibold text-white/30">out</span>}
                     </span>
                   </div>
                 ))}
@@ -883,7 +910,7 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
                     s.drag = null;
                     pushHud();
                   }}
-                  className="pointer-events-auto cursor-pointer rounded-full border border-white/10 bg-black/45 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-300 backdrop-blur-md hover:text-white"
+                  className="pf-panel pointer-events-auto cursor-pointer px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-white/65 transition-colors hover:text-white sm:text-[10px]"
                 >
                   {h.paused ? "Resume" : "Pause"}
                 </button>
@@ -892,42 +919,64 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
           </div>
 
           {turnLabel && !h.paused && (
-            <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 sm:top-4">
-              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/55 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-white backdrop-blur-md">
-                <span className="h-2 w-2 rounded-full" style={{ background: SIDE_COLORS[h.turn], boxShadow: `0 0 10px ${SIDE_COLORS[h.turn]}` }} />
+            <div className="pointer-events-none absolute left-1/2 top-2.5 -translate-x-1/2 sm:top-4">
+              <div className="pf-panel flex items-center gap-2 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-white sm:text-[11px]">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: SIDE_COLORS[h.turn], boxShadow: `0 0 10px ${SIDE_COLORS[h.turn]}` }}
+                />
                 {turnLabel}
               </div>
             </div>
           )}
 
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 p-3 sm:p-4">
-            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-white/10">
+            <div className="h-[5px] w-40 overflow-hidden rounded-full border border-white/10 bg-black/45 sm:w-48">
               <div ref={powerRef} className="h-full rounded-full transition-none" style={{ width: 0 }} />
             </div>
-            {hint && <p className="max-w-[90%] text-center text-[11px] font-medium text-zinc-300/90 sm:text-xs">{hint}</p>}
+            {hint && (
+              <p className="max-w-[92%] text-center text-[10.5px] font-medium leading-snug text-white/60 sm:text-xs">
+                {hint}
+              </p>
+            )}
           </div>
 
           {h.banner && !h.paused && !h.over && (
-            <div key={h.banner.text + h.banner.until} className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="animate-in fade-in zoom-in-95 duration-300 text-center">
-                <div className="text-[34px] font-black uppercase tracking-[-0.02em] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.7)] sm:text-[44px]">
+            <div
+              key={h.banner.text + h.banner.until}
+              className="pointer-events-none absolute inset-0 flex items-center justify-center"
+            >
+              <div className="animate-in fade-in zoom-in-95 text-center duration-300">
+                <div
+                  className="text-[34px] font-black uppercase leading-none tracking-[-0.03em] text-white sm:text-[50px]"
+                  style={{ textShadow: "0 2px 30px rgba(0,0,0,0.85), 0 0 14px rgba(255,255,255,0.18)" }}
+                >
                   {h.banner.text}
                 </div>
-                {h.banner.sub && <div className="text-sm font-semibold text-zinc-200 drop-shadow">{h.banner.sub}</div>}
+                {h.banner.sub && (
+                  <div className="mt-1.5 text-[13px] font-bold uppercase tracking-[0.14em] text-white/75 drop-shadow">
+                    {h.banner.sub}
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {h.paused && !h.over && (
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/80">
-              <div className="text-[42px] font-black text-white">PAUSED</div>
-              <div className="text-sm text-white/60">Press P, Esc, Space, or tap to resume</div>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-zinc-950/80 backdrop-blur-[2px]">
+              <div className="text-[40px] font-black tracking-[-0.02em] text-white sm:text-[48px]">PAUSED</div>
+              <div className="text-[12px] font-medium text-white/50 sm:text-sm">
+                Press P, Esc, Space, or tap to resume
+              </div>
             </div>
           )}
 
           {h.over && (
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-rose-500/20">
-              <div className="text-[42px] font-black uppercase text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.7)]">
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-rose-500/10 via-zinc-950/55 to-zinc-950/75">
+              <div
+                className="text-[38px] font-black uppercase leading-none tracking-[-0.03em] text-white sm:text-[52px]"
+                style={{ textShadow: "0 2px 30px rgba(0,0,0,0.85)" }}
+              >
                 {h.mode === "cpu"
                   ? "Game over"
                   : h.mode === "local"
@@ -936,8 +985,10 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
                       ? "You win"
                       : "You lose"}
               </div>
-              <div className="text-sm font-semibold text-white/80">
-                {h.mode === "cpu" ? `Reached round ${h.round} · ${h.points[0].toLocaleString()} points` : `${h.points[0]} – ${h.points[1]}`}
+              <div className="pf-panel px-4 py-1.5 text-[12px] font-bold uppercase tracking-[0.12em] text-white/80">
+                {h.mode === "cpu"
+                  ? `Round ${h.round} · ${h.points[0].toLocaleString()} points`
+                  : `${h.points[0]} – ${h.points[1]}`}
               </div>
             </div>
           )}
@@ -946,31 +997,50 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
 
       {/* Mode select */}
       {h && h.phase === "menu" && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center overflow-y-auto bg-zinc-950/75 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md space-y-4 text-center">
-            <div>
-              <h3 className="text-2xl font-black uppercase tracking-tight text-white sm:text-3xl">Pen Fight</h3>
-              <p className="mt-1 text-xs text-zinc-400">Flick your pens. Knock theirs off the desk. Last side standing wins.</p>
+        <div className="pf-sheet absolute inset-0 z-10 flex items-center justify-center overflow-y-auto p-4">
+          <div className="w-full max-w-sm">
+            <div className="mb-5 text-center">
+              <div className="mb-2 flex items-center justify-center gap-1.5">
+                <PenGlyph pen={PEN_TYPES[0]} className="h-3.5 w-16 -rotate-12" />
+                <PenGlyph pen={PEN_TYPES[2]} className="h-3.5 w-16 rotate-12" />
+              </div>
+              <h3
+                className="text-[30px] font-black uppercase leading-none tracking-[-0.035em] sm:text-[38px]"
+                style={{
+                  background: "linear-gradient(135deg, #fff 10%, #ffd9a0 55%, #ff9f1c 100%)",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  color: "transparent",
+                }}
+              >
+                Pen Fight
+              </h3>
+              <p className="mx-auto mt-2 max-w-[19rem] text-[12px] leading-relaxed text-white/55 sm:text-[13px]">
+                Flick your pens. Knock theirs off the desk. Last side standing wins.
+              </p>
             </div>
             <div className="grid gap-2">
               {(
                 [
-                  ["cpu", "vs CPU", "Survive rounds of a sharper and sharper opponent. Scores go on the leaderboard."],
-                  ["local", "2 Players", "Pass the device — the camera swings to whoever's turn it is."],
-                  ["online", "Online", "Create a room and share the 4-letter code with a friend."],
-                ] as [Mode, string, string][]
-              ).map(([m, title, desc]) => (
+                  ["cpu", "vs CPU", "Rounds that get sharper. Scores go to the leaderboard.", "1P"],
+                  ["local", "2 Players", "Pass the device — the camera swings to whoever's up.", "2P"],
+                  ["online", "Online", "Create a room, share the 4-letter code.", "NET"],
+                ] as [Mode, string, string, string][]
+              ).map(([m, title, desc, tag]) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => chooseMode(m)}
-                  className="group flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-white/10 bg-zinc-900/80 px-4 py-3 text-left transition-colors hover:border-white/25 hover:bg-zinc-800/80"
+                  className="pf-option group flex cursor-pointer items-center gap-3 px-4 py-3 text-left"
                 >
-                  <span>
-                    <span className="block text-sm font-black uppercase tracking-wider text-white">{title}</span>
-                    <span className="block text-[11px] text-zinc-400">{desc}</span>
+                  <span className="pf-option-tag">{tag}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-black uppercase tracking-[0.06em] text-white">{title}</span>
+                    <span className="block text-[11px] leading-snug text-white/50">{desc}</span>
                   </span>
-                  <span className="text-zinc-500 transition-transform group-hover:translate-x-0.5">→</span>
+                  <span className="text-white/30 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-white/70">
+                    →
+                  </span>
                 </button>
               ))}
             </div>
@@ -980,16 +1050,18 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
 
       {/* Online lobby */}
       {h && h.phase === "lobby" && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-zinc-950/85 p-6 backdrop-blur-sm">
-          <div className="w-full max-w-xs space-y-4 rounded-2xl border border-white/10 bg-zinc-900/80 p-6 text-center">
+        <div className="pf-sheet absolute inset-0 z-10 flex items-center justify-center p-6">
+          <div className="pf-card w-full max-w-xs space-y-4 p-6 text-center">
             {netPhase === "idle" && (
               <>
-                <h3 className="text-lg font-black uppercase tracking-tight text-white">Play a friend online</h3>
-                <p className="text-xs text-zinc-400">Create a room and share the code, or enter a code you were given.</p>
+                <h3 className="text-[17px] font-black uppercase tracking-[-0.01em] text-white">Play a friend online</h3>
+                <p className="text-[11.5px] leading-relaxed text-white/55">
+                  Create a room and share the code, or enter a code you were given.
+                </p>
                 <button
                   type="button"
                   onClick={() => connect("host", makeRoomCode())}
-                  className="h-10 w-full cursor-pointer rounded-full bg-white text-xs font-bold uppercase tracking-wider text-black transition-opacity hover:opacity-90"
+                  className="pf-cta h-10 w-full cursor-pointer text-[11px] font-black uppercase tracking-[0.12em]"
                 >
                   Create room
                 </button>
@@ -1006,31 +1078,43 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
                     placeholder="CODE"
                     maxLength={4}
                     aria-label="Room code"
-                    className="h-10 min-w-0 flex-1 rounded-full border border-white/10 bg-zinc-950 px-4 text-center font-mono text-sm font-bold uppercase tracking-[0.3em] text-white focus:border-white/30 focus:outline-none"
+                    className="h-10 min-w-0 flex-1 rounded-full border border-white/12 bg-black/50 px-4 text-center font-mono text-sm font-bold uppercase tracking-[0.3em] text-white placeholder:text-white/25 focus:border-white/35 focus:outline-none"
                   />
                   <button
                     type="submit"
                     disabled={joinCode.length !== 4}
-                    className="h-10 cursor-pointer rounded-full border border-white/15 px-4 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="h-10 cursor-pointer rounded-full border border-white/15 px-4 text-[11px] font-black uppercase tracking-[0.1em] text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     Join
                   </button>
                 </form>
                 {netError && (
-                  <p role="alert" className="text-[11px] font-medium text-rose-300">{netError}</p>
+                  <p role="alert" className="text-[11px] font-semibold text-rose-300">
+                    {netError}
+                  </p>
                 )}
-                <button type="button" onClick={backToMenu} className="cursor-pointer text-[11px] font-semibold text-zinc-500 hover:text-white">
+                <button
+                  type="button"
+                  onClick={backToMenu}
+                  className="cursor-pointer text-[11px] font-semibold text-white/40 transition-colors hover:text-white"
+                >
                   Back
                 </button>
               </>
             )}
-            {netPhase === "connecting" && <p className="text-sm font-semibold text-zinc-300">Connecting…</p>}
+            {netPhase === "connecting" && <p className="text-[13px] font-semibold text-white/70">Connecting…</p>}
             {netPhase === "waiting" && (
               <>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Room code</p>
-                <p className="font-mono text-4xl font-black tracking-[0.3em] text-white">{roomCode}</p>
-                <p className="text-xs text-zinc-400">Share this code. You both pick pens once they join.</p>
-                <button type="button" onClick={backToMenu} className="cursor-pointer text-[11px] font-semibold text-zinc-500 hover:text-white">
+                <p className="text-[9.5px] font-black uppercase tracking-[0.18em] text-white/40">Room code</p>
+                <p className="font-mono text-[40px] font-black leading-none tracking-[0.22em] text-white">{roomCode}</p>
+                <p className="text-[11.5px] leading-relaxed text-white/55">
+                  Share this code. You both pick pens once they join.
+                </p>
+                <button
+                  type="button"
+                  onClick={backToMenu}
+                  className="cursor-pointer text-[11px] font-semibold text-white/40 transition-colors hover:text-white"
+                >
                   Cancel
                 </button>
               </>
@@ -1041,13 +1125,13 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
 
       {/* Opponent left */}
       {netPhase === "ended" && h && h.phase !== "menu" && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-zinc-950/85 p-6 backdrop-blur-sm">
-          <div className="w-full max-w-xs space-y-4 rounded-2xl border border-white/10 bg-zinc-900/80 p-6 text-center">
-            <p className="text-sm font-semibold text-zinc-300">{netError ?? "Match over"}</p>
+        <div className="pf-sheet absolute inset-0 z-20 flex items-center justify-center p-6">
+          <div className="pf-card w-full max-w-xs space-y-4 p-6 text-center">
+            <p className="text-[13px] font-semibold text-white/75">{netError ?? "Match over"}</p>
             <button
               type="button"
               onClick={backToMenu}
-              className="h-10 w-full cursor-pointer rounded-full bg-white text-xs font-bold uppercase tracking-wider text-black"
+              className="pf-cta h-10 w-full cursor-pointer text-[11px] font-black uppercase tracking-[0.12em]"
             >
               Back
             </button>
@@ -1057,14 +1141,20 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
 
       {/* Pen select */}
       {h && h.phase === "pens" && (
-        <div className="absolute inset-0 z-10 overflow-y-auto bg-zinc-950/80 p-3 backdrop-blur-sm sm:p-5">
+        <div className="pf-sheet absolute inset-0 z-10 overflow-y-auto p-3 sm:p-5">
           <div className="mx-auto max-w-3xl">
             <div className="mb-3 flex items-end justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-black uppercase tracking-tight text-white sm:text-2xl">
-                  {h.mode === "local" ? `Player ${pickFor + 1}, pick your pen` : "Pick your pen"}
+              <div className="min-w-0">
+                <h3 className="text-[17px] font-black uppercase leading-tight tracking-[-0.015em] text-white sm:text-[24px]">
+                  {h.mode === "local" ? (
+                    <>
+                      <span style={{ color: SIDE_COLORS[pickFor] }}>Player {pickFor + 1}</span>, pick your pen
+                    </>
+                  ) : (
+                    "Pick your pen"
+                  )}
                 </h3>
-                <p className="text-[11px] text-zinc-400 sm:text-xs">
+                <p className="text-[11px] leading-snug text-white/50 sm:text-xs">
                   {h.mode === "online"
                     ? h.peerPicked
                       ? "Your opponent has picked. Choose yours to start."
@@ -1072,26 +1162,191 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
                     : "Weight shoves, speed carries, grip stops. Every pen plays differently."}
                 </p>
               </div>
-              <button type="button" onClick={backToMenu} className="cursor-pointer text-[11px] font-semibold text-zinc-500 hover:text-white">
+              <button
+                type="button"
+                onClick={backToMenu}
+                className="shrink-0 cursor-pointer text-[11px] font-semibold text-white/40 transition-colors hover:text-white"
+              >
                 {h.mode === "online" ? "Leave" : "Back"}
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 lg:grid-cols-4">
               {PEN_TYPES.map((p) => (
-                <PenCard key={p.id} pen={p} side={h.mode === "local" ? pickFor : h.mySide} onPick={() => choosePen(p.id)} />
+                <PenCard
+                  key={p.id}
+                  pen={p}
+                  side={h.mode === "local" ? pickFor : h.mySide}
+                  onPick={() => choosePen(p.id)}
+                />
               ))}
             </div>
             {h.mode === "online" && (
-              <p className="mt-3 text-center text-[11px] text-zinc-500">
-                {h.myPicked ? "Pen locked in. The match starts as soon as both sides have picked." : `Room ${roomCode}`}
+              <p className="mt-3 text-center text-[11px] text-white/40">
+                {h.myPicked ? "Pen locked in. The match starts once both sides have picked." : `Room ${roomCode}`}
               </p>
             )}
           </div>
         </div>
       )}
+
+      {/* Overlay chrome. Scoped here so the game owns its own dark surface
+          treatment — the canvas is deliberately dark in both site themes. */}
+      <style>{`
+        .pf-panel {
+          border-radius: 1rem;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(10,9,14,0.55);
+          -webkit-backdrop-filter: blur(14px) saturate(160%);
+          backdrop-filter: blur(14px) saturate(160%);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 6px 22px -10px rgba(0,0,0,0.8);
+        }
+        .pf-sheet {
+          background: radial-gradient(90% 70% at 50% 35%, rgba(18,15,26,0.82), rgba(7,6,12,0.93));
+          -webkit-backdrop-filter: blur(7px);
+          backdrop-filter: blur(7px);
+        }
+        .pf-card {
+          border-radius: 1.25rem;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(20,18,26,0.85);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 24px 60px -20px rgba(0,0,0,0.9);
+        }
+        .pf-option {
+          border-radius: 1rem;
+          border: 1px solid rgba(255,255,255,0.09);
+          background: linear-gradient(135deg, rgba(32,28,42,0.8), rgba(18,16,24,0.8));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+          transition: border-color 200ms ease, background-color 200ms ease, transform 220ms cubic-bezier(0.34,1.56,0.64,1);
+        }
+        .pf-option:hover {
+          border-color: rgba(255,159,28,0.45);
+          transform: translateY(-2px);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 14px 34px -16px rgba(255,159,28,0.65);
+        }
+        .pf-option:active { transform: translateY(0) scale(0.99); }
+        .pf-option-tag {
+          display: inline-flex;
+          height: 1.9rem;
+          width: 1.9rem;
+          flex: none;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.12);
+          background: rgba(255,255,255,0.05);
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+          color: rgba(255,255,255,0.65);
+        }
+        .pf-option:hover .pf-option-tag { color: #ff9f1c; border-color: rgba(255,159,28,0.5); }
+        .pf-cta {
+          border-radius: 999px;
+          color: #fff;
+          background: linear-gradient(135deg, #ff9f1c 0%, #ff4d6d 100%);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 10px 24px -10px rgba(255,159,28,0.7);
+          transition: filter 180ms ease, transform 180ms cubic-bezier(0.34,1.56,0.64,1);
+        }
+        .pf-cta:hover { filter: brightness(1.07); }
+        .pf-cta:active { transform: scale(0.97); }
+        .pf-pen {
+          border-radius: 1rem;
+          border: 1px solid rgba(255,255,255,0.09);
+          background: linear-gradient(160deg, rgba(30,27,39,0.85), rgba(16,14,22,0.85));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+          transition: border-color 200ms ease, transform 220ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 220ms ease;
+        }
+        .pf-pen:hover {
+          transform: translateY(-3px);
+          border-color: color-mix(in srgb, var(--pen) 55%, transparent);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 18px 40px -20px var(--pen);
+        }
+        .pf-pen:active { transform: translateY(-1px) scale(0.99); }
+        @media (prefers-reduced-motion: reduce) {
+          .pf-option, .pf-option:hover, .pf-pen, .pf-pen:hover, .pf-cta, .pf-cta:active { transform: none; transition-duration: 1ms; }
+        }
+      `}</style>
     </div>
   );
 };
+
+/**
+ * A pen drawn side-on, from the same numbers the 3D build and the physics use.
+ *
+ * The vertical gradient is what sells the cylinder: dark at both edges, bright
+ * just above the middle where the lamp would catch it. Each silhouette matches
+ * its 3D counterpart so the card is a preview, not a generic icon.
+ */
+function PenGlyph({ pen, className }: { pen: PenType; className?: string }) {
+  const W = 100;
+  const H = 20;
+  const cy = H / 2;
+  // Barrel thickness, scaled from the real radius so a marker reads as fat.
+  const r = Math.min(7.5, 2.6 + pen.radius * 4.6);
+  const id = `pf-${pen.id}`;
+  const { body, accent, tip } = pen.colors;
+  const metal = pen.finish.metalness > 0.6;
+
+  const tipLen = pen.shape === "marker" || pen.shape === "highlighter" ? 7 : 10;
+  const tipX = W - tipLen;
+  // Cap band near the back, in the pen's accent colour.
+  const capW = pen.shape === "pencil" ? 13 : 20;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className={className} aria-hidden focusable="false">
+      <defs>
+        <linearGradient id={`${id}-b`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#000" stopOpacity={metal ? 0.55 : 0.4} />
+          <stop offset="26%" stopColor="#fff" stopOpacity={metal ? 0.75 : 0.42} />
+          <stop offset="48%" stopColor="#fff" stopOpacity="0" />
+          <stop offset="100%" stopColor="#000" stopOpacity={metal ? 0.6 : 0.48} />
+        </linearGradient>
+        <linearGradient id={`${id}-a`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#000" stopOpacity="0.35" />
+          <stop offset="30%" stopColor="#fff" stopOpacity="0.4" />
+          <stop offset="55%" stopColor="#fff" stopOpacity="0" />
+          <stop offset="100%" stopColor="#000" stopOpacity="0.45" />
+        </linearGradient>
+      </defs>
+
+      {/* Barrel */}
+      <rect x="2" y={cy - r} width={tipX - 2} height={r * 2} rx={pen.shape === "pencil" ? 0 : r} fill={body} />
+      <rect
+        x="2"
+        y={cy - r}
+        width={tipX - 2}
+        height={r * 2}
+        rx={pen.shape === "pencil" ? 0 : r}
+        fill={`url(#${id}-b)`}
+      />
+
+      {/* Cap / grip band */}
+      <rect x="2" y={cy - r} width={capW} height={r * 2} rx={pen.shape === "pencil" ? 0 : r} fill={accent} />
+      <rect x="2" y={cy - r} width={capW} height={r * 2} rx={pen.shape === "pencil" ? 0 : r} fill={`url(#${id}-a)`} />
+
+      {/* Tip: a cone for writing pens, a chisel for markers */}
+      {pen.shape === "marker" || pen.shape === "highlighter" ? (
+        <>
+          <rect x={tipX} y={cy - r * 0.55} width={tipLen} height={r * 1.1} rx="1.5" fill={tip} />
+          <rect x={tipX} y={cy - r * 0.55} width={tipLen} height={r * 1.1} rx="1.5" fill={`url(#${id}-a)`} />
+        </>
+      ) : (
+        <>
+          <path d={`M${tipX} ${cy - r} L${W - 1} ${cy} L${tipX} ${cy + r} Z`} fill={tip} />
+          <path d={`M${tipX} ${cy - r} L${W - 1} ${cy} L${tipX} ${cy + r} Z`} fill={`url(#${id}-a)`} />
+        </>
+      )}
+
+      {/* The pencil's graphite point reads wrong without a dark nib. */}
+      {pen.shape === "pencil" && <path d={`M${W - 4} ${cy - 1.3} L${W - 1} ${cy} L${W - 4} ${cy + 1.3} Z`} fill="#2b2b2b" />}
+
+      {/* Pocket clip, on the pens that have one in 3D. */}
+      {(pen.shape === "ballpoint" || pen.shape === "gel" || pen.shape === "jotter" || pen.shape === "fountain") && (
+        <rect x="8" y={cy - r - 1.6} width="15" height="1.9" rx="0.9" fill={metal ? "#e5e7eb" : accent} opacity="0.95" />
+      )}
+    </svg>
+  );
+}
 
 function PenCard({ pen, side, onPick }: { pen: PenType; side: Side; onPick: () => void }) {
   const st = penStats(pen);
@@ -1106,34 +1361,38 @@ function PenCard({ pen, side, onPick }: { pen: PenType; side: Side; onPick: () =
     <button
       type="button"
       onClick={onPick}
-      className="group cursor-pointer rounded-2xl border border-white/10 bg-zinc-900/80 p-3 text-left transition-colors hover:border-white/30 hover:bg-zinc-800/80 focus-visible:outline-2"
+      className="pf-pen group cursor-pointer p-3 text-left focus-visible:outline-2"
       style={{ "--pen": SIDE_COLORS[side] } as React.CSSProperties}
     >
-      {/* A side-on swatch of the pen: barrel, cap, tip. */}
-      <div className="mb-2 flex h-4 items-center">
-        <span className="h-2.5 w-3 rounded-l-full" style={{ background: pen.colors.accent }} />
-        <span className="h-3 flex-1" style={{ background: pen.colors.body, boxShadow: "inset 0 -2px 2px rgba(0,0,0,0.35), inset 0 2px 2px rgba(255,255,255,0.25)" }} />
-        <span className="h-0 w-0 border-y-[6px] border-l-[8px] border-y-transparent" style={{ borderLeftColor: pen.colors.tip }} />
+      <div className="mb-2 flex h-7 items-center rounded-lg bg-black/25 px-1.5">
+        <PenGlyph pen={pen} className="h-5 w-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
       </div>
-      <div className="text-[12px] font-black uppercase tracking-wide text-white sm:text-[13px]">{pen.name}</div>
-      <div className="mb-2 line-clamp-2 text-[10px] leading-snug text-zinc-400 sm:text-[11px]">{pen.tagline}</div>
-      <dl className="space-y-1">
+      <div className="text-[12px] font-black uppercase leading-tight tracking-[0.02em] text-white sm:text-[12.5px]">
+        {pen.name}
+      </div>
+      <div className="mb-2 mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/45 sm:text-[10.5px]">
+        {pen.tagline}
+      </div>
+      <dl className="space-y-[3px]">
         {rows.map(([name, v]) => (
           <div key={name} className="flex items-center justify-between gap-2">
-            <dt className="text-[9px] font-semibold uppercase tracking-[0.1em] text-zinc-500">{name}</dt>
-            <dd className="flex gap-0.5">
+            <dt className="text-[8.5px] font-bold uppercase tracking-[0.1em] text-white/35">{name}</dt>
+            <dd className="flex gap-[2px]">
               {[1, 2, 3, 4, 5].map((i) => (
                 <span
                   key={i}
-                  className="h-1.5 w-2.5 rounded-sm"
-                  style={{ background: i <= v ? "var(--pen)" : "rgba(255,255,255,0.1)" }}
+                  className="h-1.5 w-2.5 rounded-[1px]"
+                  style={{
+                    background: i <= v ? "var(--pen)" : "rgba(255,255,255,0.08)",
+                    boxShadow: i <= v ? "0 0 5px color-mix(in srgb, var(--pen) 45%, transparent)" : undefined,
+                  }}
                 />
               ))}
             </dd>
           </div>
         ))}
       </dl>
-      <div className="mt-2.5 rounded-full border border-white/15 py-1 text-center text-[10px] font-bold uppercase tracking-wider text-white transition-colors group-hover:bg-white group-hover:text-black">
+      <div className="mt-2.5 rounded-full border border-white/15 py-1 text-center text-[9.5px] font-black uppercase tracking-[0.12em] text-white/70 transition-colors group-hover:bg-white group-hover:text-black">
         Choose
       </div>
     </button>
