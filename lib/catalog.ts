@@ -23,6 +23,8 @@ export interface CatalogGame {
   maxScore: number;
   /** Highest plausible points per second, used to catch scores impossible for the play time. */
   maxRate: number;
+  /** Sorts to the front of every listing and shows a Trending badge. */
+  trending?: boolean;
 }
 
 export const CATALOG: CatalogGame[] = [
@@ -250,12 +252,13 @@ export const CATALOG: CatalogGame[] = [
     title: "Pen Fight",
     slug: "pen-fight",
     description:
-      "The school-desk classic in full 3D. Flick your pens into the other side's and knock them off the edge. Seven pens with their own weight, speed and grip; play the CPU, pass the phone to a friend, or share a room code and play online.",
+      "The school-desk classic in full 3D. Flick your pens into the other side's and knock them off the edge. Seven pens, each with its own weight, speed and grip. Play with AI, hand the phone back and forth with a friend beside you, or send a room code to a friend far away.",
     category: "Action",
     difficulty: "Medium",
     rating: 4.9,
     plays: 0,
     controls: {
+      modes: "Play with AI · 2 friends, 1 phone · Friend far away",
       flick: "Drag back from your pen, release",
       aim: "Left / Right",
       power: "Up / Down",
@@ -266,11 +269,13 @@ export const CATALOG: CatalogGame[] = [
     rules: [
       "A pen whose centre crosses the desk edge falls off. Knock theirs off; keep yours on.",
       "Knocking off a pen scores 100, and each extra pen in the same flick scores 50 more.",
-      "vs CPU: clear its pens to win the round and earn a bonus. Lose all of yours and it is over.",
+      "Three ways to play: with AI, two friends on one phone, or a friend far away on a room code.",
+      "With AI: clear its pens to win the round and earn a bonus. Lose all of yours and it is over.",
       "Every pen is different — heavy pens shove, light pens fly, grippy pens stop short.",
     ],
     maxScore: 100_000,
     maxRate: 250,
+    trending: true,
   },
 ];
 
@@ -320,4 +325,21 @@ export const CATALOG_GAMES: Game[] = CATALOG.map((g) => ({
 
 export function getCatalogGame(slug: string): CatalogGame | undefined {
   return CATALOG_BY_SLUG.get(slug);
+}
+
+export function isTrending(slug: string): boolean {
+  return CATALOG_BY_SLUG.get(slug)?.trending === true;
+}
+
+/**
+ * The order every listing uses: trending games first, then alphabetical.
+ *
+ * The database sorts by title and knows nothing about trending — the flag
+ * lives in the catalog — so listings are re-sorted here rather than in SQL,
+ * which also keeps the offline fallback in the same order as the live data.
+ */
+export function sortGames<T extends { slug: string; title: string }>(games: T[]): T[] {
+  return [...games].sort(
+    (a, b) => Number(isTrending(b.slug)) - Number(isTrending(a.slug)) || a.title.localeCompare(b.title)
+  );
 }

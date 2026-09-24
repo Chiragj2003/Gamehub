@@ -25,6 +25,7 @@ Every game runs at the same speed on every screen, works on phones and tablets w
 
 | Game | Controls | What you're doing |
 |------|----------|-------------------|
+| **Pen Fight** | Drag back from a pen and release · ← → aim · ↑ ↓ power · Space flick · Shift switch pen | The school-desk game in 3D. Knock the other side's pens off the edge. Seven pens with their own weight, speed, grip and bounce. **Play with AI** for the leaderboard (rounds get harder), **2 friends on 1 phone** (the camera swings to whoever's up), or a **friend far away** on a 4-letter room code. |
 | **Snake** | Arrows / WASD · swipe | Eat, grow, don't crash. Speeds up with every pellet. |
 | **Pong** | W/S or arrows · drag | First to 11 vs. the CPU, **2 Player** on one keyboard, or **Online** — create a room, share the 4-letter code. |
 | **Tetris** | ← → move · ↑/X rotate · Z rotate back · ↓ soft drop · Space hard drop · C hold · touch: tap rotate, swipe | Full SRS rotation with wall kicks and T-spin scoring, 7-bag order, hold, lock delay, ghost, next preview. |
@@ -35,13 +36,14 @@ Every game runs at the same speed on every screen, works on phones and tablets w
 | **Pac-Man Style** | Arrows / WASD · swipe | Four ghosts with real chase AI. Power pellets flip it: 200, 400, 800, 1600. |
 | **2048** | Arrows / WASD · swipe | Merge to 2048, then keep going. Best score saved on your device. |
 | **Chrome Dino** | Space / tap jump · ↓ / swipe-down duck | Jump the cacti, duck the birds. Speed never stops climbing. |
-| **Pen Fight** | Drag back from a pen and release · ← → aim · ↑ ↓ power · Space flick · Shift switch pen | The school-desk game in 3D. Knock the other side's pens off the edge. Seven pens with their own weight, speed, grip and bounce. **vs CPU** for the leaderboard (rounds get harder), **2 Player** pass-and-play (the camera swings to whoever's up), or **Online** with a 4-letter room code. |
 
 ---
 
 ## Leaderboards and your library
 
-- **Leaderboards** are per-game, top 10. Every run opens a server-side session when you press Play; a score can only be attached to that session, the server measures the play time itself, and anything impossible for the game or the time is rejected. Submissions are rate-limited. Your own best on this device is shown separately, never mixed into the global board.
+- Pen Fight is flagged `trending` in [`lib/catalog.ts`](lib/catalog.ts), which sorts it to the front of every listing and badges its card.
+
+**Leaderboards** are per-game, top 10. Every run opens a server-side session when you press Play; a score can only be attached to that session, the server measures the play time itself, and anything impossible for the game or the time is rejected. Submissions are rate-limited. Your own best on this device is shown separately, never mixed into the global board.
 - **My Library** keeps the games you've saved. Sign in with email and it follows your account across devices; anything you saved before signing in is merged in. Without an account it stays on the device.
 - **Your account** (`/account`) shows your sign-in, lets you change your password, sign out, or delete the account and everything tied to it. Forgot your password? The sign-in dialog has a reset link.
 - Every score is also saved locally on your device first, so a dropped connection never loses a run.

@@ -1,7 +1,8 @@
 import * as queries from "./db-queries";
+import { sortGames } from "./catalog";
 
 export async function getAllGames() {
-  return await queries.queryAllGames();
+  return sortGames(await queries.queryAllGames());
 }
 
 export async function getFeaturedGames() {
@@ -13,14 +14,14 @@ export async function getGameBySlug(slug: string) {
 }
 
 export async function getGamesByCategory(category: string) {
-  return await queries.queryGamesByCategory(category);
+  return sortGames(await queries.queryGamesByCategory(category));
 }
 
 export async function searchGames(query: string) {
   if (!query || !query.trim()) {
-    return await queries.queryAllGames();
+    return sortGames(await queries.queryAllGames());
   }
-  return await queries.querySearchGames(query.trim());
+  return sortGames(await queries.querySearchGames(query.trim()));
 }
 
 export async function incrementPlayCount(id: number) {

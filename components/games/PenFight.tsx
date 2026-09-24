@@ -1022,9 +1022,9 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
             <div className="grid gap-2">
               {(
                 [
-                  ["cpu", "vs CPU", "Rounds that get sharper. Scores go to the leaderboard.", "1P"],
-                  ["local", "2 Players", "Pass the device — the camera swings to whoever's up.", "2P"],
-                  ["online", "Online", "Create a room, share the 4-letter code.", "NET"],
+                  ["cpu", "Play with AI", "You against the computer. It gets sharper every round, and your score goes to the leaderboard.", "AI"],
+                  ["local", "2 friends, 1 phone", "Pass the device back and forth. The camera swings round to whoever's turn it is.", "2P"],
+                  ["online", "Friend far away", "Create a room and send them the 4-letter code. You play on your own phones.", "NET"],
                 ] as [Mode, string, string, string][]
               ).map(([m, title, desc, tag]) => (
                 <button
@@ -1054,9 +1054,9 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
           <div className="pf-card w-full max-w-xs space-y-4 p-6 text-center">
             {netPhase === "idle" && (
               <>
-                <h3 className="text-[17px] font-black uppercase tracking-[-0.01em] text-white">Play a friend online</h3>
+                <h3 className="text-[17px] font-black uppercase tracking-[-0.01em] text-white">Play a friend far away</h3>
                 <p className="text-[11.5px] leading-relaxed text-white/55">
-                  Create a room and share the code, or enter a code you were given.
+                  Create a room and send them the code, or enter a code they sent you.
                 </p>
                 <button
                   type="button"

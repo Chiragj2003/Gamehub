@@ -3,6 +3,7 @@ import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { PlayIcon, StarIcon } from "@hugeicons/core-free-icons";
 import { categoryColor, difficultyColor } from "@/lib/accents";
+import { isTrending } from "@/lib/catalog";
 
 interface GameCardProps {
   title: string;
@@ -21,6 +22,7 @@ interface GameCardProps {
 export function GameCard({ title, description, category, difficulty, rating, plays, slug }: GameCardProps) {
   const cat = categoryColor(category);
   const diff = difficultyColor(difficulty);
+  const trending = isTrending(slug);
 
   return (
     <Link
@@ -41,6 +43,15 @@ export function GameCard({ title, description, category, difficulty, rating, pla
         >
           {title.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase()}
         </span>
+
+        {trending && (
+          <span className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-gradient-to-br from-brand to-brand-2 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-white shadow-[0_4px_14px_-4px_var(--brand-glow)]">
+            <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 fill-current" aria-hidden>
+              <path d="M6 0C6 3 3.5 3.5 2.2 5.4A4.4 4.4 0 0 0 1.5 8a4.5 4.5 0 0 0 9 0c0-2.2-1.4-3.3-2.3-4.6-.3 1-.9 1.6-1.5 2C6.6 4 7 2.2 6 0Z" />
+            </svg>
+            Trending
+          </span>
+        )}
 
         {/* Play affordance: hidden until hover/focus so the grid stays calm. */}
         <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors duration-300 group-hover:bg-black/10 group-focus-visible:bg-black/10">
