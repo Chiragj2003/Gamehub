@@ -827,7 +827,7 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
     : "";
   const label = (side: Side) => (h ? (h.mode === "cpu" ? (side === 0 ? "You" : "CPU") : h.mode === "local" ? `P${side + 1}` : side === h.mySide ? "You" : "Rival") : "");
   return (
-    <div ref={containerRef} className="relative h-full w-full select-none overflow-hidden bg-[#0b0a10]">
+    <div ref={containerRef} className="pf-root relative h-full w-full select-none overflow-hidden bg-[#0b0a10]">
       <canvas
         ref={canvasRef}
         className="block h-full w-full touch-none"
@@ -841,7 +841,7 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
       />
 
       {/* Lens vignette. The renderer has no post-processing pass; one CSS
-          gradient buys most of what a cinematic grade would, for nothing. */}
+          gradient buys most of what a grade would, for nothing. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -851,54 +851,44 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
         }}
       />
 
-      {/* In-game HUD */}
+      {/* In-game HUD. Stays dark and small: the desk is the thing to look at. */}
       {h && h.phase === "play" && (
         <>
-          <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2.5 text-white sm:p-4">
-            <div className="pf-panel px-3 py-2 sm:px-3.5">
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2.5 sm:p-4">
+            <div className="pf-chip">
               {h.mode === "cpu" ? (
                 <>
-                  <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/45 sm:text-[10px]">
-                    Round {h.round}
-                  </div>
-                  <div className="font-mono text-[17px] font-black leading-tight tabular-nums sm:text-xl">
-                    {h.points[0].toLocaleString()}
-                  </div>
+                  <span className="pf-chip-label">Round {h.round}</span>
+                  <span className="pf-chip-value">{h.points[0].toLocaleString()}</span>
                 </>
               ) : (
-                <div className="flex items-center gap-2.5 font-mono text-[13px] font-black tabular-nums sm:text-sm">
-                  <span style={{ color: SIDE_COLORS[0] }}>
-                    {label(0)} {h.points[0]}
-                  </span>
-                  <span className="text-white/25">·</span>
-                  <span style={{ color: SIDE_COLORS[1] }}>
-                    {label(1)} {h.points[1]}
-                  </span>
-                </div>
+                <span className="pf-chip-value flex items-center gap-2">
+                  <span style={{ color: SIDE_COLORS[0] }}>{h.points[0]}</span>
+                  <span className="text-white/25">/</span>
+                  <span style={{ color: SIDE_COLORS[1] }}>{h.points[1]}</span>
+                </span>
               )}
             </div>
 
             <div className="flex flex-col items-end gap-1.5 sm:gap-2">
-              <div className="pf-panel flex items-center gap-2.5 px-3 py-2 sm:gap-3.5">
+              <div className="pf-chip flex-row items-center gap-3 sm:gap-4">
                 {([0, 1] as Side[]).map((side) => (
-                  <div key={side} className="flex items-center gap-1.5" title={h.penNames[side]}>
-                    <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/45 sm:text-[10px]">
-                      {label(side)}
-                    </span>
+                  <span key={side} className="flex items-center gap-1.5" title={h.penNames[side]}>
+                    <span className="pf-chip-label !mb-0">{label(side)}</span>
                     <span className="flex items-center gap-[3px]">
                       {Array.from({ length: Math.max(h.alive[side], 0) }).map((_, i) => (
                         <span
                           key={i}
-                          className="block h-3.5 w-[5px] rounded-[2px]"
+                          className="block h-3.5 w-[5px] rounded-[1px]"
                           style={{
-                            background: `linear-gradient(180deg, ${SIDE_COLORS[side]}, color-mix(in srgb, ${SIDE_COLORS[side]} 55%, #000))`,
-                            boxShadow: `0 0 7px color-mix(in srgb, ${SIDE_COLORS[side]} 60%, transparent)`,
+                            background: SIDE_COLORS[side],
+                            boxShadow: `0 0 8px color-mix(in srgb, ${SIDE_COLORS[side]} 70%, transparent)`,
                           }}
                         />
                       ))}
-                      {h.alive[side] === 0 && <span className="text-[10px] font-semibold text-white/30">out</span>}
+                      {h.alive[side] === 0 && <span className="pf-chip-label !mb-0 opacity-60">out</span>}
                     </span>
-                  </div>
+                  </span>
                 ))}
               </div>
               {!h.over && (
@@ -910,9 +900,9 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
                     s.drag = null;
                     pushHud();
                   }}
-                  className="pf-panel pointer-events-auto cursor-pointer px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-white/65 transition-colors hover:text-white sm:text-[10px]"
+                  className="pf-chip pointer-events-auto cursor-pointer !py-1 transition-colors hover:text-white"
                 >
-                  {h.paused ? "Resume" : "Pause"}
+                  <span className="pf-chip-label !mb-0">{h.paused ? "Resume" : "Pause"}</span>
                 </button>
               )}
             </div>
@@ -920,12 +910,12 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
 
           {turnLabel && !h.paused && (
             <div className="pointer-events-none absolute left-1/2 top-2.5 -translate-x-1/2 sm:top-4">
-              <div className="pf-panel flex items-center gap-2 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-white sm:text-[11px]">
+              <div className="pf-chip flex-row items-center gap-2 !py-1.5">
                 <span
                   className="h-1.5 w-1.5 rounded-full"
                   style={{ background: SIDE_COLORS[h.turn], boxShadow: `0 0 10px ${SIDE_COLORS[h.turn]}` }}
                 />
-                {turnLabel}
+                <span className="pf-chip-label !mb-0 !text-white/85">{turnLabel}</span>
               </div>
             </div>
           )}
@@ -934,11 +924,7 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
             <div className="h-[5px] w-40 overflow-hidden rounded-full border border-white/10 bg-black/45 sm:w-48">
               <div ref={powerRef} className="h-full rounded-full transition-none" style={{ width: 0 }} />
             </div>
-            {hint && (
-              <p className="max-w-[92%] text-center text-[10.5px] font-medium leading-snug text-white/60 sm:text-xs">
-                {hint}
-              </p>
-            )}
+            {hint && <p className="pf-hint">{hint}</p>}
           </div>
 
           {h.banner && !h.paused && !h.over && (
@@ -947,36 +933,22 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
               className="pointer-events-none absolute inset-0 flex items-center justify-center"
             >
               <div className="animate-in fade-in zoom-in-95 text-center duration-300">
-                <div
-                  className="text-[34px] font-black uppercase leading-none tracking-[-0.03em] text-white sm:text-[50px]"
-                  style={{ textShadow: "0 2px 30px rgba(0,0,0,0.85), 0 0 14px rgba(255,255,255,0.18)" }}
-                >
-                  {h.banner.text}
-                </div>
-                {h.banner.sub && (
-                  <div className="mt-1.5 text-[13px] font-bold uppercase tracking-[0.14em] text-white/75 drop-shadow">
-                    {h.banner.sub}
-                  </div>
-                )}
+                <div className="pf-banner">{h.banner.text}</div>
+                {h.banner.sub && <div className="pf-banner-sub">{h.banner.sub}</div>}
               </div>
             </div>
           )}
 
           {h.paused && !h.over && (
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-zinc-950/80 backdrop-blur-[2px]">
-              <div className="text-[40px] font-black tracking-[-0.02em] text-white sm:text-[48px]">PAUSED</div>
-              <div className="text-[12px] font-medium text-white/50 sm:text-sm">
-                Press P, Esc, Space, or tap to resume
-              </div>
+              <div className="pf-banner">Paused</div>
+              <div className="pf-banner-sub">Press P, Esc, Space, or tap to resume</div>
             </div>
           )}
 
           {h.over && (
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-rose-500/10 via-zinc-950/55 to-zinc-950/75">
-              <div
-                className="text-[38px] font-black uppercase leading-none tracking-[-0.03em] text-white sm:text-[52px]"
-                style={{ textShadow: "0 2px 30px rgba(0,0,0,0.85)" }}
-              >
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-950/55">
+              <div className="pf-banner">
                 {h.mode === "cpu"
                   ? "Game over"
                   : h.mode === "local"
@@ -985,285 +957,518 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
                       ? "You win"
                       : "You lose"}
               </div>
-              <div className="pf-panel px-4 py-1.5 text-[12px] font-bold uppercase tracking-[0.12em] text-white/80">
-                {h.mode === "cpu"
-                  ? `Round ${h.round} · ${h.points[0].toLocaleString()} points`
-                  : `${h.points[0]} – ${h.points[1]}`}
+              <div className="pf-chip !flex-row items-center gap-2">
+                <span className="pf-chip-value">
+                  {h.mode === "cpu" ? h.points[0].toLocaleString() : `${h.points[0]} – ${h.points[1]}`}
+                </span>
+                {h.mode === "cpu" && <span className="pf-chip-label !mb-0">points · round {h.round}</span>}
               </div>
             </div>
           )}
         </>
       )}
 
-      {/* Mode select */}
+      {/* ---- The notebook. Everything you choose happens on paper. ---- */}
+
       {h && h.phase === "menu" && (
-        <div className="pf-sheet absolute inset-0 z-10 flex items-center justify-center overflow-y-auto p-4">
-          <div className="w-full max-w-sm">
-            <div className="mb-5 text-center">
-              <div className="mb-2 flex items-center justify-center gap-1.5">
-                <PenGlyph pen={PEN_TYPES[0]} className="h-3.5 w-16 -rotate-12" />
-                <PenGlyph pen={PEN_TYPES[2]} className="h-3.5 w-16 rotate-12" />
-              </div>
-              <h3
-                className="text-[30px] font-black uppercase leading-none tracking-[-0.035em] sm:text-[38px]"
-                style={{
-                  background: "linear-gradient(135deg, #fff 10%, #ffd9a0 55%, #ff9f1c 100%)",
-                  WebkitBackgroundClip: "text",
-                  backgroundClip: "text",
-                  color: "transparent",
-                }}
-              >
-                Pen Fight
-              </h3>
-              <p className="mx-auto mt-2 max-w-[19rem] text-[12px] leading-relaxed text-white/55 sm:text-[13px]">
+        <div className="pf-desk">
+          <div className="pf-page pf-page--narrow">
+            <div className="pf-page-inner">
+              <h3 className="pf-title">Pen Fight</h3>
+              <p className="pf-standfirst">
                 Flick your pens. Knock theirs off the desk. Last side standing wins.
               </p>
-            </div>
-            <div className="grid gap-2">
-              {(
-                [
-                  ["cpu", "Play with AI", "You against the computer. It gets sharper every round, and your score goes to the leaderboard.", "AI"],
-                  ["local", "2 friends, 1 phone", "Pass the device back and forth. The camera swings round to whoever's turn it is.", "2P"],
-                  ["online", "Friend far away", "Create a room and send them the 4-letter code. You play on your own phones.", "NET"],
-                ] as [Mode, string, string, string][]
-              ).map(([m, title, desc, tag]) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => chooseMode(m)}
-                  className="pf-option group flex cursor-pointer items-center gap-3 px-4 py-3 text-left"
-                >
-                  <span className="pf-option-tag">{tag}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-black uppercase tracking-[0.06em] text-white">{title}</span>
-                    <span className="block text-[11px] leading-snug text-white/50">{desc}</span>
-                  </span>
-                  <span className="text-white/30 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-white/70">
-                    →
-                  </span>
-                </button>
-              ))}
+
+              <ul className="pf-modes">
+                {(
+                  [
+                    ["cpu", "Play with AI", "The computer gets sharper every round. Your score goes to the leaderboard."],
+                    ["local", "2 friends, 1 phone", "Pass the phone back and forth. The desk turns round to face whoever is up."],
+                    ["online", "Friend far away", "Start a room, send them the code, and play from your own phones."],
+                  ] as [Mode, string, string][]
+                ).map(([m, title, desc]) => (
+                  <li key={m}>
+                    <button type="button" onClick={() => chooseMode(m)} className="pf-mode">
+                      <WhoDiagram mode={m} />
+                      <span className="min-w-0 flex-1">
+                        <span className="pf-mode-title">{title}</span>
+                        <span className="pf-mode-desc">{desc}</span>
+                      </span>
+                      <span className="pf-mode-go" aria-hidden>
+                        →
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
       )}
 
-      {/* Online lobby */}
       {h && h.phase === "lobby" && (
-        <div className="pf-sheet absolute inset-0 z-10 flex items-center justify-center p-6">
-          <div className="pf-card w-full max-w-xs space-y-4 p-6 text-center">
-            {netPhase === "idle" && (
-              <>
-                <h3 className="text-[17px] font-black uppercase tracking-[-0.01em] text-white">Play a friend far away</h3>
-                <p className="text-[11.5px] leading-relaxed text-white/55">
-                  Create a room and send them the code, or enter a code they sent you.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => connect("host", makeRoomCode())}
-                  className="pf-cta h-10 w-full cursor-pointer text-[11px] font-black uppercase tracking-[0.12em]"
-                >
-                  Create room
-                </button>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (joinCode.length === 4) connect("guest", joinCode);
-                  }}
-                  className="flex gap-2"
-                >
-                  <input
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(normalizeRoomCode(e.target.value))}
-                    placeholder="CODE"
-                    maxLength={4}
-                    aria-label="Room code"
-                    className="h-10 min-w-0 flex-1 rounded-full border border-white/12 bg-black/50 px-4 text-center font-mono text-sm font-bold uppercase tracking-[0.3em] text-white placeholder:text-white/25 focus:border-white/35 focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    disabled={joinCode.length !== 4}
-                    className="h-10 cursor-pointer rounded-full border border-white/15 px-4 text-[11px] font-black uppercase tracking-[0.1em] text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    Join
-                  </button>
-                </form>
-                {netError && (
-                  <p role="alert" className="text-[11px] font-semibold text-rose-300">
-                    {netError}
+        <div className="pf-desk">
+          <div className="pf-page pf-page--narrow">
+            <div className="pf-page-inner text-center">
+              {netPhase === "idle" && (
+                <>
+                  <h3 className="pf-title pf-title--sm">Friend far away</h3>
+                  <p className="pf-standfirst">
+                    Start a room and send them the code, or type in the code they sent you.
                   </p>
-                )}
-                <button
-                  type="button"
-                  onClick={backToMenu}
-                  className="cursor-pointer text-[11px] font-semibold text-white/40 transition-colors hover:text-white"
-                >
-                  Back
-                </button>
-              </>
-            )}
-            {netPhase === "connecting" && <p className="text-[13px] font-semibold text-white/70">Connecting…</p>}
-            {netPhase === "waiting" && (
-              <>
-                <p className="text-[9.5px] font-black uppercase tracking-[0.18em] text-white/40">Room code</p>
-                <p className="font-mono text-[40px] font-black leading-none tracking-[0.22em] text-white">{roomCode}</p>
-                <p className="text-[11.5px] leading-relaxed text-white/55">
-                  Share this code. You both pick pens once they join.
-                </p>
-                <button
-                  type="button"
-                  onClick={backToMenu}
-                  className="cursor-pointer text-[11px] font-semibold text-white/40 transition-colors hover:text-white"
-                >
-                  Cancel
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Opponent left */}
-      {netPhase === "ended" && h && h.phase !== "menu" && (
-        <div className="pf-sheet absolute inset-0 z-20 flex items-center justify-center p-6">
-          <div className="pf-card w-full max-w-xs space-y-4 p-6 text-center">
-            <p className="text-[13px] font-semibold text-white/75">{netError ?? "Match over"}</p>
-            <button
-              type="button"
-              onClick={backToMenu}
-              className="pf-cta h-10 w-full cursor-pointer text-[11px] font-black uppercase tracking-[0.12em]"
-            >
-              Back
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Pen select */}
-      {h && h.phase === "pens" && (
-        <div className="pf-sheet absolute inset-0 z-10 overflow-y-auto p-3 sm:p-5">
-          <div className="mx-auto max-w-3xl">
-            <div className="mb-3 flex items-end justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="text-[17px] font-black uppercase leading-tight tracking-[-0.015em] text-white sm:text-[24px]">
-                  {h.mode === "local" ? (
-                    <>
-                      <span style={{ color: SIDE_COLORS[pickFor] }}>Player {pickFor + 1}</span>, pick your pen
-                    </>
-                  ) : (
-                    "Pick your pen"
+                  <button type="button" onClick={() => connect("host", makeRoomCode())} className="pf-btn mt-1 w-full">
+                    Start a room
+                  </button>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (joinCode.length === 4) connect("guest", joinCode);
+                    }}
+                    className="mt-3 flex gap-2"
+                  >
+                    <input
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(normalizeRoomCode(e.target.value))}
+                      placeholder="CODE"
+                      maxLength={4}
+                      aria-label="Room code"
+                      className="pf-input"
+                    />
+                    <button type="submit" disabled={joinCode.length !== 4} className="pf-btn pf-btn--quiet">
+                      Join
+                    </button>
+                  </form>
+                  {netError && (
+                    <p role="alert" className="pf-error">
+                      {netError}
+                    </p>
                   )}
-                </h3>
-                <p className="text-[11px] leading-snug text-white/50 sm:text-xs">
-                  {h.mode === "online"
-                    ? h.peerPicked
-                      ? "Your opponent has picked. Choose yours to start."
-                      : "Waiting for your opponent to pick too."
-                    : "Weight shoves, speed carries, grip stops. Every pen plays differently."}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={backToMenu}
-                className="shrink-0 cursor-pointer text-[11px] font-semibold text-white/40 transition-colors hover:text-white"
-              >
-                {h.mode === "online" ? "Leave" : "Back"}
+                  <button type="button" onClick={backToMenu} className="pf-back">
+                    Back
+                  </button>
+                </>
+              )}
+              {netPhase === "connecting" && <p className="pf-standfirst !mb-0">Connecting…</p>}
+              {netPhase === "waiting" && (
+                <>
+                  <span className="pf-eyebrow">Your room code</span>
+                  <p className="pf-code">{roomCode}</p>
+                  <p className="pf-standfirst">Send them this code. You both pick pens once they arrive.</p>
+                  <button type="button" onClick={backToMenu} className="pf-back">
+                    Cancel
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {netPhase === "ended" && h && h.phase !== "menu" && (
+        <div className="pf-desk z-20">
+          <div className="pf-page pf-page--narrow">
+            <div className="pf-page-inner text-center">
+              <h3 className="pf-title pf-title--sm">Match over</h3>
+              <p className="pf-standfirst">{netError ?? "The match ended."}</p>
+              <button type="button" onClick={backToMenu} className="pf-btn w-full">
+                Back to modes
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 lg:grid-cols-4">
-              {PEN_TYPES.map((p) => (
-                <PenCard
-                  key={p.id}
-                  pen={p}
-                  side={h.mode === "local" ? pickFor : h.mySide}
-                  onPick={() => choosePen(p.id)}
-                />
-              ))}
-            </div>
-            {h.mode === "online" && (
-              <p className="mt-3 text-center text-[11px] text-white/40">
-                {h.myPicked ? "Pen locked in. The match starts once both sides have picked." : `Room ${roomCode}`}
-              </p>
-            )}
           </div>
         </div>
       )}
 
-      {/* Overlay chrome. Scoped here so the game owns its own dark surface
-          treatment — the canvas is deliberately dark in both site themes. */}
+      {/* The catalogue. Every pen is drawn to the same scale, so the page
+          itself tells you the pencil is longest and the highlighter fattest. */}
+      {h && h.phase === "pens" && (
+        <div className="pf-desk">
+          <div className="pf-page">
+            <div className="pf-page-inner">
+              <div className="mb-3 flex items-baseline justify-between gap-3 sm:mb-4">
+                <div className="min-w-0">
+                  <span className="pf-eyebrow">
+                    {h.mode === "local" ? `Player ${pickFor + 1}` : "The pencil box"}
+                  </span>
+                  <h3 className="pf-title pf-title--sm">Pick your pen</h3>
+                </div>
+                <button type="button" onClick={backToMenu} className="pf-back !mt-0 shrink-0">
+                  {h.mode === "online" ? "Leave" : "Back"}
+                </button>
+              </div>
+              <p className="pf-note">
+                {h.mode === "online"
+                  ? h.peerPicked
+                    ? "Your opponent has picked. Choose yours to start."
+                    : "Waiting for your opponent to pick too."
+                  : "Drawn to scale. Heavy pens shove, light pens fly, grippy pens stop short."}
+              </p>
+
+              <ul className="pf-catalogue">
+                {PEN_TYPES.map((p) => (
+                  <li key={p.id}>
+                    <PenEntry
+                      pen={p}
+                      side={h.mode === "local" ? pickFor : h.mySide}
+                      onPick={() => choosePen(p.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
+
+              {h.mode === "online" && (
+                <p className="pf-note !mt-4 text-center">
+                  {h.myPicked ? "Pen locked in. The match starts once you have both picked." : `Room ${roomCode}`}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Art direction for this game only. The site is glass and dark; Pen
+          Fight is ink on paper, because that is what the game was played on. */}
       <style>{`
-        .pf-panel {
-          border-radius: 1rem;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(10,9,14,0.55);
-          -webkit-backdrop-filter: blur(14px) saturate(160%);
-          backdrop-filter: blur(14px) saturate(160%);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 6px 22px -10px rgba(0,0,0,0.8);
+        .pf-root {
+          --pf-paper: #e4e0cf;
+          --pf-paper-edge: #cdc8b3;
+          --pf-rule: #7f97ab;
+          --pf-margin: #be3a2b;
+          --pf-ink: #16233f;
+          --pf-ink-2: #5a6678;
+          --pf-blue: ${SIDE_COLORS[0]};
+          --pf-red: ${SIDE_COLORS[1]};
+          --pf-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+          --pf-mono: var(--font-geist-mono), ui-monospace, monospace;
         }
-        .pf-sheet {
-          background: radial-gradient(90% 70% at 50% 35%, rgba(18,15,26,0.82), rgba(7,6,12,0.93));
-          -webkit-backdrop-filter: blur(7px);
-          backdrop-filter: blur(7px);
+
+        /* ---- In-play chrome: dark, small, out of the way ---- */
+        .pf-chip {
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+          border-radius: 0.6rem;
+          border: 1px solid rgba(255,255,255,0.12);
+          background: rgba(10,9,14,0.6);
+          padding: 0.4rem 0.7rem;
+          color: #fff;
+          -webkit-backdrop-filter: blur(12px);
+          backdrop-filter: blur(12px);
         }
-        .pf-card {
-          border-radius: 1.25rem;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(20,18,26,0.85);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 24px 60px -20px rgba(0,0,0,0.9);
+        .pf-chip-label {
+          display: block;
+          margin-bottom: 1px;
+          font-family: var(--pf-mono);
+          font-size: 9px;
+          font-weight: 600;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.5);
+          white-space: nowrap;
         }
-        .pf-option {
-          border-radius: 1rem;
-          border: 1px solid rgba(255,255,255,0.09);
-          background: linear-gradient(135deg, rgba(32,28,42,0.8), rgba(18,16,24,0.8));
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
-          transition: border-color 200ms ease, background-color 200ms ease, transform 220ms cubic-bezier(0.34,1.56,0.64,1);
+        .pf-chip-value {
+          font-family: var(--pf-mono);
+          font-size: 16px;
+          font-weight: 700;
+          line-height: 1.1;
+          font-variant-numeric: tabular-nums;
         }
-        .pf-option:hover {
-          border-color: rgba(255,159,28,0.45);
-          transform: translateY(-2px);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 14px 34px -16px rgba(255,159,28,0.65);
+        .pf-hint {
+          max-width: 92%;
+          text-align: center;
+          font-family: var(--pf-mono);
+          font-size: 10px;
+          letter-spacing: 0.02em;
+          line-height: 1.5;
+          color: rgba(255,255,255,0.55);
         }
-        .pf-option:active { transform: translateY(0) scale(0.99); }
-        .pf-option-tag {
-          display: inline-flex;
-          height: 1.9rem;
-          width: 1.9rem;
-          flex: none;
+        .pf-banner {
+          font-family: var(--pf-display);
+          font-size: clamp(30px, 8vw, 54px);
+          font-weight: 800;
+          letter-spacing: -0.035em;
+          line-height: 1;
+          color: #fff;
+          text-shadow: 0 2px 30px rgba(0,0,0,0.9);
+        }
+        .pf-banner-sub {
+          margin-top: 0.4rem;
+          font-family: var(--pf-mono);
+          font-size: 11px;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.7);
+        }
+
+        /* ---- The notebook lying on the desk ---- */
+        .pf-desk {
+          position: absolute;
+          inset: 0;
+          z-index: 10;
+          display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 999px;
-          border: 1px solid rgba(255,255,255,0.12);
-          background: rgba(255,255,255,0.05);
-          font-size: 9px;
+          overflow-y: auto;
+          padding: clamp(0.5rem, 3vw, 2rem);
+          background: radial-gradient(85% 70% at 50% 42%, rgba(8,6,14,0.3), rgba(6,5,12,0.66));
+        }
+
+        .pf-page {
+          position: relative;
+          margin: auto;
+          width: 100%;
+          max-width: 44rem;
+          border-radius: 3px;
+          background: var(--pf-paper);
+          color: var(--pf-ink);
+          box-shadow:
+            0 1px 0 rgba(255,255,255,0.5) inset,
+            0 24px 60px -18px rgba(0,0,0,0.85),
+            0 2px 0 var(--pf-paper-edge);
+          /* Ruled feint, and the red margin printed down the left. */
+          background-image:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+            repeating-linear-gradient(
+              to bottom,
+              transparent 0 27px,
+              color-mix(in srgb, var(--pf-rule) 58%, transparent) 27px 28px
+            ),
+            linear-gradient(to right, transparent 0 34px, color-mix(in srgb, var(--pf-margin) 62%, transparent) 34px 35px, transparent 35px 37px, color-mix(in srgb, var(--pf-margin) 30%, transparent) 37px 38px, transparent 38px);
+          background-position: 0 0, 0 6px, 0 0;
+        }
+        .pf-page--narrow { max-width: 30rem; }
+        .pf-page-inner { padding: 1.75rem 1.5rem 1.75rem 3.5rem; }
+
+        .pf-title {
+          font-family: var(--pf-display);
+          font-size: clamp(30px, 7vw, 46px);
           font-weight: 800;
-          letter-spacing: 0.06em;
-          color: rgba(255,255,255,0.65);
+          letter-spacing: -0.04em;
+          line-height: 0.95;
+          color: var(--pf-ink);
         }
-        .pf-option:hover .pf-option-tag { color: #ff9f1c; border-color: rgba(255,159,28,0.5); }
-        .pf-cta {
-          border-radius: 999px;
-          color: #fff;
-          background: linear-gradient(135deg, #ff9f1c 0%, #ff4d6d 100%);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 10px 24px -10px rgba(255,159,28,0.7);
-          transition: filter 180ms ease, transform 180ms cubic-bezier(0.34,1.56,0.64,1);
+        .pf-title--sm { font-size: clamp(21px, 4.4vw, 28px); }
+        .pf-title::after {
+          content: "";
+          display: block;
+          width: 2.6em;
+          max-width: 100%;
+          margin-top: 0.28em;
+          height: 4px;
+          border-top: 2px solid var(--pf-margin);
+          border-bottom: 1px solid color-mix(in srgb, var(--pf-margin) 45%, transparent);
         }
-        .pf-cta:hover { filter: brightness(1.07); }
-        .pf-cta:active { transform: scale(0.97); }
-        .pf-pen {
-          border-radius: 1rem;
-          border: 1px solid rgba(255,255,255,0.09);
-          background: linear-gradient(160deg, rgba(30,27,39,0.85), rgba(16,14,22,0.85));
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
-          transition: border-color 200ms ease, transform 220ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 220ms ease;
+        .pf-eyebrow {
+          display: block;
+          font-family: var(--pf-mono);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: var(--pf-margin);
         }
-        .pf-pen:hover {
-          transform: translateY(-3px);
-          border-color: color-mix(in srgb, var(--pen) 55%, transparent);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 18px 40px -20px var(--pen);
+        .pf-standfirst {
+          margin: 0.6rem 0 1.15rem;
+          font-size: 13.5px;
+          line-height: 1.55;
+          color: var(--pf-ink-2);
         }
-        .pf-pen:active { transform: translateY(-1px) scale(0.99); }
+        .pf-note {
+          margin-bottom: 1rem;
+          font-family: var(--pf-mono);
+          font-size: 10.5px;
+          line-height: 1.6;
+          letter-spacing: 0.01em;
+          color: var(--pf-ink-2);
+        }
+
+        /* ---- Mode list ---- */
+        .pf-modes { display: grid; gap: 0.45rem; }
+        .pf-mode {
+          display: flex;
+          width: 100%;
+          align-items: center;
+          gap: 0.85rem;
+          cursor: pointer;
+          border: 0;
+          border-bottom: 1px solid color-mix(in srgb, var(--pf-ink) 16%, transparent);
+          background: none;
+          padding: 0.7rem 0.2rem;
+          text-align: left;
+          color: inherit;
+          transition: background-color 160ms ease, padding-left 200ms var(--ease-out, ease);
+        }
+        .pf-modes li:last-child .pf-mode { border-bottom: 0; }
+        .pf-mode:hover, .pf-mode:focus-visible {
+          background: color-mix(in srgb, var(--pf-blue) 8%, transparent);
+          padding-left: 0.55rem;
+          outline: none;
+        }
+        .pf-mode-title {
+          display: block;
+          font-family: var(--pf-display);
+          font-size: 16px;
+          font-weight: 700;
+          letter-spacing: -0.015em;
+          color: var(--pf-ink);
+        }
+        .pf-mode-desc {
+          display: block;
+          margin-top: 2px;
+          font-size: 12px;
+          line-height: 1.45;
+          color: var(--pf-ink-2);
+        }
+        .pf-mode-go { font-size: 17px; color: color-mix(in srgb, var(--pf-ink) 35%, transparent); transition: color 160ms ease, transform 200ms ease; }
+        .pf-mode:hover .pf-mode-go { color: var(--pf-blue); transform: translateX(2px); }
+        .pf-who { flex: none; color: var(--pf-ink); }
+
+        /* ---- Catalogue ---- */
+        .pf-catalogue { display: grid; gap: 0.35rem; }
+        .pf-entry {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 0.15rem 1.15rem;
+          width: 100%;
+          cursor: pointer;
+          border: 0;
+          background: none;
+          padding: 0.6rem 0.4rem 0.7rem;
+          text-align: left;
+          color: inherit;
+          transition: background-color 160ms ease;
+        }
+        .pf-entry:hover, .pf-entry:focus-visible {
+          background: color-mix(in srgb, var(--pf-pen) 10%, transparent);
+          outline: none;
+        }
+        .pf-entry-head { display: flex; align-items: baseline; gap: 0.5rem; }
+        .pf-entry-name {
+          font-family: var(--pf-display);
+          font-size: 14.5px;
+          font-weight: 700;
+          letter-spacing: -0.015em;
+          color: var(--pf-ink);
+        }
+        .pf-entry-spec {
+          font-family: var(--pf-mono);
+          font-size: 10px;
+          letter-spacing: 0.04em;
+          color: var(--pf-ink-2);
+          white-space: nowrap;
+        }
+        .pf-entry-tagline { font-size: 11.5px; line-height: 1.45; color: var(--pf-ink-2); }
+        .pf-entry-draw { margin: 0.3rem 0; display: block; width: 100%; height: auto; }
+        .pf-stats { display: flex; flex-wrap: wrap; gap: 0.15rem 0.9rem; }
+        .pf-stat { display: flex; align-items: center; gap: 0.35rem; }
+        .pf-stat-name {
+          font-family: var(--pf-mono);
+          font-size: 9px;
+          font-weight: 600;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: color-mix(in srgb, var(--pf-ink) 55%, transparent);
+        }
+        .pf-pip { display: block; width: 8px; height: 3px; background: color-mix(in srgb, var(--pf-ink) 18%, transparent); }
+        .pf-pip--on { background: var(--pf-pen); }
+        .pf-take {
+          margin-top: 0.45rem;
+          justify-self: start;
+          font-family: var(--pf-mono);
+          font-size: 9.5px;
+          font-weight: 600;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: var(--pf-pen);
+          border-bottom: 1px solid currentColor;
+          padding-bottom: 1px;
+          opacity: 0;
+          transition: opacity 160ms ease;
+        }
+        .pf-entry:hover .pf-take, .pf-entry:focus-visible .pf-take { opacity: 1; }
+        @media (hover: none) { .pf-take { opacity: 1; } }
+        @media (min-width: 640px) {
+          .pf-entry { grid-template-columns: 17.5rem 1fr; align-items: center; }
+          .pf-entry-draw { grid-row: span 3; margin: 0; }
+          .pf-take { margin-top: 0.3rem; }
+        }
+
+        /* ---- Controls ---- */
+        .pf-btn {
+          display: inline-flex;
+          height: 2.45rem;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          border: 0;
+          border-radius: 2px;
+          background: var(--pf-ink);
+          padding: 0 1.1rem;
+          font-family: var(--pf-mono);
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: var(--pf-paper);
+          transition: background-color 160ms ease;
+        }
+        .pf-btn:hover { background: var(--pf-blue); }
+        .pf-btn--quiet {
+          background: none;
+          color: var(--pf-ink);
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pf-ink) 35%, transparent);
+        }
+        .pf-btn--quiet:hover { background: color-mix(in srgb, var(--pf-ink) 10%, transparent); }
+        .pf-btn:disabled { cursor: not-allowed; opacity: 0.35; }
+        .pf-btn:disabled:hover { background: none; }
+        .pf-input {
+          height: 2.45rem;
+          min-width: 0;
+          flex: 1;
+          border: 0;
+          border-radius: 2px;
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pf-ink) 30%, transparent);
+          background: color-mix(in srgb, #fff 35%, transparent);
+          padding: 0 0.9rem;
+          text-align: center;
+          font-family: var(--pf-mono);
+          font-size: 15px;
+          font-weight: 700;
+          letter-spacing: 0.3em;
+          text-transform: uppercase;
+          color: var(--pf-ink);
+        }
+        .pf-input::placeholder { color: color-mix(in srgb, var(--pf-ink) 35%, transparent); letter-spacing: 0.3em; }
+        .pf-input:focus { outline: none; box-shadow: inset 0 0 0 2px var(--pf-blue); }
+        .pf-code {
+          font-family: var(--pf-mono);
+          font-size: clamp(34px, 11vw, 46px);
+          font-weight: 700;
+          letter-spacing: 0.2em;
+          line-height: 1.2;
+          color: var(--pf-ink);
+          text-indent: 0.2em;
+        }
+        .pf-error { margin-top: 0.7rem; font-size: 12px; font-weight: 600; color: var(--pf-margin); }
+        .pf-back {
+          margin-top: 1rem;
+          cursor: pointer;
+          border: 0;
+          background: none;
+          font-family: var(--pf-mono);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: var(--pf-ink-2);
+          text-decoration: underline;
+          text-underline-offset: 3px;
+        }
+        .pf-back:hover { color: var(--pf-ink); }
+
         @media (prefers-reduced-motion: reduce) {
-          .pf-option, .pf-option:hover, .pf-pen, .pf-pen:hover, .pf-cta, .pf-cta:active { transform: none; transition-duration: 1ms; }
+          .pf-mode, .pf-mode:hover, .pf-mode-go, .pf-take, .pf-entry { transition-duration: 1ms; }
+          .pf-mode:hover { padding-left: 0.2rem; }
+          .pf-mode:hover .pf-mode-go { transform: none; }
         }
       `}</style>
     </div>
@@ -1271,130 +1476,163 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
 };
 
 /**
- * A pen drawn side-on, from the same numbers the 3D build and the physics use.
- *
- * The vertical gradient is what sells the cylinder: dark at both edges, bright
- * just above the middle where the lamp would catch it. Each silhouette matches
- * its 3D counterpart so the card is a preview, not a generic icon.
+ * Who is playing, and on what. The three modes differ by exactly that, so the
+ * diagram carries the distinction instead of a decorative number would.
  */
-function PenGlyph({ pen, className }: { pen: PenType; className?: string }) {
-  const W = 100;
-  const H = 20;
-  const cy = H / 2;
-  // Barrel thickness, scaled from the real radius so a marker reads as fat.
-  const r = Math.min(7.5, 2.6 + pen.radius * 4.6);
-  const id = `pf-${pen.id}`;
-  const { body, accent, tip } = pen.colors;
-  const metal = pen.finish.metalness > 0.6;
-
-  const tipLen = pen.shape === "marker" || pen.shape === "highlighter" ? 7 : 10;
-  const tipX = W - tipLen;
-  // Cap band near the back, in the pen's accent colour.
-  const capW = pen.shape === "pencil" ? 13 : 20;
-
+function WhoDiagram({ mode }: { mode: Mode }) {
+  const stroke = "currentColor";
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className={className} aria-hidden focusable="false">
-      <defs>
-        <linearGradient id={`${id}-b`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#000" stopOpacity={metal ? 0.55 : 0.4} />
-          <stop offset="26%" stopColor="#fff" stopOpacity={metal ? 0.75 : 0.42} />
-          <stop offset="48%" stopColor="#fff" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000" stopOpacity={metal ? 0.6 : 0.48} />
-        </linearGradient>
-        <linearGradient id={`${id}-a`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#000" stopOpacity="0.35" />
-          <stop offset="30%" stopColor="#fff" stopOpacity="0.4" />
-          <stop offset="55%" stopColor="#fff" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000" stopOpacity="0.45" />
-        </linearGradient>
-      </defs>
-
-      {/* Barrel */}
-      <rect x="2" y={cy - r} width={tipX - 2} height={r * 2} rx={pen.shape === "pencil" ? 0 : r} fill={body} />
-      <rect
-        x="2"
-        y={cy - r}
-        width={tipX - 2}
-        height={r * 2}
-        rx={pen.shape === "pencil" ? 0 : r}
-        fill={`url(#${id}-b)`}
-      />
-
-      {/* Cap / grip band */}
-      <rect x="2" y={cy - r} width={capW} height={r * 2} rx={pen.shape === "pencil" ? 0 : r} fill={accent} />
-      <rect x="2" y={cy - r} width={capW} height={r * 2} rx={pen.shape === "pencil" ? 0 : r} fill={`url(#${id}-a)`} />
-
-      {/* Tip: a cone for writing pens, a chisel for markers */}
-      {pen.shape === "marker" || pen.shape === "highlighter" ? (
+    <svg viewBox="0 0 40 24" className="pf-who h-6 w-10" aria-hidden focusable="false">
+      {mode === "cpu" && (
         <>
-          <rect x={tipX} y={cy - r * 0.55} width={tipLen} height={r * 1.1} rx="1.5" fill={tip} />
-          <rect x={tipX} y={cy - r * 0.55} width={tipLen} height={r * 1.1} rx="1.5" fill={`url(#${id}-a)`} />
-        </>
-      ) : (
-        <>
-          <path d={`M${tipX} ${cy - r} L${W - 1} ${cy} L${tipX} ${cy + r} Z`} fill={tip} />
-          <path d={`M${tipX} ${cy - r} L${W - 1} ${cy} L${tipX} ${cy + r} Z`} fill={`url(#${id}-a)`} />
+          <circle cx="9" cy="12" r="4" fill={stroke} />
+          <rect x="24" y="7" width="10" height="10" rx="1.5" fill="none" stroke={stroke} strokeWidth="1.5" />
+          <path d="M26 5v2M29 5v2M32 5v2M26 17v2M29 17v2M32 17v2" stroke={stroke} strokeWidth="1.2" />
+          <path d="M15 12h5" stroke={stroke} strokeWidth="1.2" />
         </>
       )}
-
-      {/* The pencil's graphite point reads wrong without a dark nib. */}
-      {pen.shape === "pencil" && <path d={`M${W - 4} ${cy - 1.3} L${W - 1} ${cy} L${W - 4} ${cy + 1.3} Z`} fill="#2b2b2b" />}
-
-      {/* Pocket clip, on the pens that have one in 3D. */}
-      {(pen.shape === "ballpoint" || pen.shape === "gel" || pen.shape === "jotter" || pen.shape === "fountain") && (
-        <rect x="8" y={cy - r - 1.6} width="15" height="1.9" rx="0.9" fill={metal ? "#e5e7eb" : accent} opacity="0.95" />
+      {mode === "local" && (
+        <>
+          <rect x="12" y="2" width="16" height="20" rx="2.5" fill="none" stroke={stroke} strokeWidth="1.5" />
+          <circle cx="20" cy="8" r="3" fill={stroke} />
+          <circle cx="20" cy="16" r="3" fill={stroke} opacity="0.45" />
+        </>
+      )}
+      {mode === "online" && (
+        <>
+          <rect x="1" y="5" width="11" height="14" rx="2" fill="none" stroke={stroke} strokeWidth="1.5" />
+          <circle cx="6.5" cy="12" r="2.6" fill={stroke} />
+          <rect x="28" y="5" width="11" height="14" rx="2" fill="none" stroke={stroke} strokeWidth="1.5" />
+          <circle cx="33.5" cy="12" r="2.6" fill={stroke} opacity="0.45" />
+          <path d="M14 12h12" stroke={stroke} strokeWidth="1.2" strokeDasharray="2 2.5" />
+        </>
       )}
     </svg>
   );
 }
 
-function PenCard({ pen, side, onPick }: { pen: PenType; side: Side; onPick: () => void }) {
+/** The longest and the fattest pen in the box; the drawing scale comes from these. */
+const MAX_HALF_LEN = Math.max(...PEN_TYPES.map((p) => p.halfLen));
+const MAX_RADIUS = Math.max(...PEN_TYPES.map((p) => p.radius));
+
+/**
+ * A pen drawn at true scale, in centimetres, from the same numbers the 3D
+ * build and the physics use — so the catalogue page itself shows you that the
+ * pencil really is the longest and the highlighter really is the fattest.
+ *
+ * The vertical gradient is what sells the cylinder: dark at both edges, bright
+ * just above the middle where the lamp would catch it.
+ */
+function PenDrawing({ pen, className }: { pen: PenType; className?: string }) {
+  const PAD = 0.5;
+  const W = MAX_HALF_LEN * 2 + PAD * 2;
+  const H = MAX_RADIUS * 2 + PAD * 2;
+  const cy = H / 2;
+  const r = pen.radius;
+  const len = pen.halfLen * 2;
+  const x0 = PAD;
+  const id = `pd-${pen.id}`;
+  const { body, accent, tip } = pen.colors;
+  const metal = pen.finish.metalness > 0.6;
+  const hex = pen.shape === "pencil";
+  const chisel = pen.shape === "marker" || pen.shape === "highlighter";
+
+  const tipLen = chisel ? 0.9 : 1.6;
+  const tipX = x0 + len - tipLen;
+  const capW = Math.min(len * 0.28, 3.2);
+  const round = hex ? 0 : r;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className={className} aria-hidden focusable="false">
+      <defs>
+        <linearGradient id={`${id}-b`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#000" stopOpacity={metal ? 0.5 : 0.36} />
+          <stop offset="26%" stopColor="#fff" stopOpacity={metal ? 0.8 : 0.45} />
+          <stop offset="50%" stopColor="#fff" stopOpacity="0" />
+          <stop offset="100%" stopColor="#000" stopOpacity={metal ? 0.55 : 0.45} />
+        </linearGradient>
+        <linearGradient id={`${id}-a`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#000" stopOpacity="0.32" />
+          <stop offset="30%" stopColor="#fff" stopOpacity="0.4" />
+          <stop offset="58%" stopColor="#fff" stopOpacity="0" />
+          <stop offset="100%" stopColor="#000" stopOpacity="0.42" />
+        </linearGradient>
+      </defs>
+
+      {/* Contact shadow: the pen is lying on the page, not floating over it. */}
+      <ellipse cx={x0 + len / 2} cy={cy + r + 0.24} rx={len / 2} ry={0.16} fill="#16233f" opacity="0.16" />
+
+      <rect x={x0} y={cy - r} width={len - tipLen} height={r * 2} rx={round} fill={body} />
+      <rect x={x0} y={cy - r} width={len - tipLen} height={r * 2} rx={round} fill={`url(#${id}-b)`} />
+
+      <rect x={x0} y={cy - r} width={capW} height={r * 2} rx={round} fill={accent} />
+      <rect x={x0} y={cy - r} width={capW} height={r * 2} rx={round} fill={`url(#${id}-a)`} />
+
+      {chisel ? (
+        <>
+          <rect x={tipX} y={cy - r * 0.55} width={tipLen} height={r * 1.1} rx={0.15} fill={tip} />
+          <rect x={tipX} y={cy - r * 0.55} width={tipLen} height={r * 1.1} rx={0.15} fill={`url(#${id}-a)`} />
+        </>
+      ) : (
+        <>
+          <path d={`M${tipX} ${cy - r} L${x0 + len} ${cy} L${tipX} ${cy + r} Z`} fill={tip} />
+          <path d={`M${tipX} ${cy - r} L${x0 + len} ${cy} L${tipX} ${cy + r} Z`} fill={`url(#${id}-a)`} />
+        </>
+      )}
+
+      {hex && <path d={`M${x0 + len - 0.55} ${cy - 0.16} L${x0 + len} ${cy} L${x0 + len - 0.55} ${cy + 0.16} Z`} fill="#2b2b2b" />}
+
+      {(pen.shape === "ballpoint" || pen.shape === "gel" || pen.shape === "jotter" || pen.shape === "fountain") && (
+        <rect x={x0 + 0.8} y={cy - r - 0.26} width={capW * 0.85} height={0.28} rx={0.14} fill={metal ? "#e5e7eb" : accent} />
+      )}
+    </svg>
+  );
+}
+
+function PenEntry({ pen, side, onPick }: { pen: PenType; side: Side; onPick: () => void }) {
   const st = penStats(pen);
+  // Reach and bounce are in the drawing and the physics; the three that change
+  // how a flick feels are the three worth printing.
   const rows: [string, number][] = [
     ["Weight", st.weight],
     ["Speed", st.speed],
     ["Grip", st.grip],
-    ["Bounce", st.bounce],
-    ["Reach", st.reach],
   ];
+  const cm = (pen.halfLen * 2).toFixed(1).replace(/\.0$/, "");
+  const grams = Math.round(pen.mass * 6);
+
   return (
     <button
       type="button"
       onClick={onPick}
-      className="pf-pen group cursor-pointer p-3 text-left focus-visible:outline-2"
-      style={{ "--pen": SIDE_COLORS[side] } as React.CSSProperties}
+      className="pf-entry"
+      style={{ "--pf-pen": SIDE_COLORS[side] } as React.CSSProperties}
     >
-      <div className="mb-2 flex h-7 items-center rounded-lg bg-black/25 px-1.5">
-        <PenGlyph pen={pen} className="h-5 w-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
-      </div>
-      <div className="text-[12px] font-black uppercase leading-tight tracking-[0.02em] text-white sm:text-[12.5px]">
-        {pen.name}
-      </div>
-      <div className="mb-2 mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/45 sm:text-[10.5px]">
-        {pen.tagline}
-      </div>
-      <dl className="space-y-[3px]">
-        {rows.map(([name, v]) => (
-          <div key={name} className="flex items-center justify-between gap-2">
-            <dt className="text-[8.5px] font-bold uppercase tracking-[0.1em] text-white/35">{name}</dt>
-            <dd className="flex gap-[2px]">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <span
-                  key={i}
-                  className="h-1.5 w-2.5 rounded-[1px]"
-                  style={{
-                    background: i <= v ? "var(--pen)" : "rgba(255,255,255,0.08)",
-                    boxShadow: i <= v ? "0 0 5px color-mix(in srgb, var(--pen) 45%, transparent)" : undefined,
-                  }}
-                />
-              ))}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      <div className="mt-2.5 rounded-full border border-white/15 py-1 text-center text-[9.5px] font-black uppercase tracking-[0.12em] text-white/70 transition-colors group-hover:bg-white group-hover:text-black">
-        Choose
-      </div>
+      <PenDrawing pen={pen} className="pf-entry-draw" />
+      <span>
+        <span className="pf-entry-head">
+          <span className="pf-entry-name">{pen.name}</span>
+          <span className="pf-entry-spec">
+            {cm} cm · {grams} g
+          </span>
+        </span>
+        <span className="pf-entry-tagline">{pen.tagline}</span>
+        <span className="mt-1.5 flex flex-col items-start gap-1">
+          <span className="pf-stats">
+            {rows.map(([name, v]) => (
+              <span key={name} className="pf-stat">
+                <span className="pf-stat-name">{name}</span>
+                <span className="flex gap-[2px]">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <span key={i} className={i <= v ? "pf-pip pf-pip--on" : "pf-pip"} />
+                  ))}
+                </span>
+              </span>
+            ))}
+          </span>
+          <span className="pf-take">Take this one</span>
+        </span>
+      </span>
     </button>
   );
 }

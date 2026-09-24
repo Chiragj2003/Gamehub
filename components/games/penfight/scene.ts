@@ -13,7 +13,12 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { TABLE_D, TABLE_W, type PenBody, type Side } from "./physics";
 import type { PenType } from "./pens";
 
-export const SIDE_COLORS: Record<Side, string> = { 0: "#22d3ee", 1: "#fb923c" };
+/**
+ * The two teams are the two pens every pencil box held: blue ink and red ink.
+ * Both are lighter and far more saturated than the desk, so a team band reads
+ * at a glance from the player's low angle.
+ */
+export const SIDE_COLORS: Record<Side, string> = { 0: "#3B63F0", 1: "#F0453B" };
 
 const TABLE_THICKNESS = 3;
 const FLOOR_Y = -72;
@@ -317,18 +322,21 @@ function buildPen(type: PenType, side: Side): THREE.Group {
     }
   }
 
-  // Team band near the cap: the one visual cue that says whose pen this is.
-  const band = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 1.12, r * 1.12, 0.7, seg),
-    new THREE.MeshStandardMaterial({
-      color: SIDE_COLORS[side],
-      emissive: SIDE_COLORS[side],
-      emissiveIntensity: 0.55,
-      roughness: 0.4,
-    })
-  );
-  along(band, -L + 4.4);
-  g.add(band);
+  // Team livery: the only cue that says whose pen this is, and it has to beat
+  // the pen's own accent colour — a red band on a cyan-gripped gel roller was
+  // losing the fight. Two bands at different widths read as livery, not trim.
+  const bandMat = new THREE.MeshStandardMaterial({
+    color: SIDE_COLORS[side],
+    emissive: SIDE_COLORS[side],
+    emissiveIntensity: 0.6,
+    roughness: 0.4,
+  });
+  const wide = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.14, r * 1.14, 1.4, seg), bandMat);
+  along(wide, -L + 4.6);
+  g.add(wide);
+  const narrow = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.14, r * 1.14, 0.5, seg), bandMat);
+  along(narrow, -L + 6.2);
+  g.add(narrow);
 
   return g;
 }
