@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { getSupabase } from "@/lib/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -22,8 +22,6 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const supabase = createClient();
-
   // Shown only once the Google provider is enabled in the Supabase dashboard
   // and NEXT_PUBLIC_AUTH_GOOGLE=1 is set, so the button never appears in a
   // state where clicking it would fail.
@@ -33,6 +31,7 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
     setError(null);
     setLoading(true);
     try {
+      const supabase = await getSupabase();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(window.location.pathname)}` },
@@ -54,6 +53,7 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
     }
     setLoading(true);
     try {
+      const supabase = await getSupabase();
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/account/reset")}`,
       });
@@ -74,6 +74,7 @@ export default function AuthModal({ isOpen, onOpenChange }: AuthModalProps) {
     setLoading(true);
 
     try {
+      const supabase = await getSupabase();
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({
           email,

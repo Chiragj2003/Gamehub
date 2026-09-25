@@ -1,17 +1,24 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Search01Icon, Menu01Icon, UserCircleIcon } from "@hugeicons/core-free-icons";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader, SheetDescription } from "@/components/ui/sheet";
-import { createClient } from "@/lib/supabase/client";
-import { User } from "@supabase/supabase-js";
-import AuthModal from "@/components/AuthModal";
-import UserMenu from "@/components/UserMenu";
+import { getSupabase } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 import ThemeToggle from "@/components/ThemeToggle";
 import SearchOverlay from "@/components/SearchOverlay";
+
+/**
+ * The signed-in menu and the sign-in dialog are conditional UI that most
+ * visits never render, and both pull in Radix overlays. Loading them on demand
+ * keeps them — and the auth client behind them — off every page's first load.
+ */
+const UserMenu = dynamic(() => import("@/components/UserMenu"), { ssr: false });
+const AuthModal = dynamic(() => import("@/components/AuthModal"), { ssr: false });
 
 const NAV = [
   { name: "Games", href: "/" },
@@ -27,10 +34,24 @@ export default function Navbar() {
   const [authOpen, setAuthOpen] = useState(false);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null));
-    return () => sub.subscription.unsubscribe();
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    // Fetching the auth library here rather than importing it keeps ~240 KB
+    // off the critical path; the header renders signed-out and fills in.
+    getSupabase().then((supabase) => {
+      if (cancelled) return;
+      supabase.auth.getUser().then(({ data }) => {
+        if (!cancelled) setUser(data.user);
+      });
+      const { data: sub } = supabase.auth.onAuthStateChange((_e, session) =>
+        setUser(session?.user ?? null)
+      );
+      unsubscribe = () => sub.subscription.unsubscribe();
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, []);
 
   return (

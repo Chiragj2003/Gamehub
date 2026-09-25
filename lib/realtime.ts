@@ -1,6 +1,6 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
+import { getSupabase } from "@/lib/supabase/client";
 
 /**
  * A two-player room over Supabase Realtime Broadcast.
@@ -50,7 +50,7 @@ export async function joinRoom<State, Input>(
   role: Role,
   events: RoomEvents<State, Input>
 ): Promise<Room<State, Input>> {
-  const supabase = createClient();
+  const supabase = await getSupabase();
   const me = crypto.randomUUID();
   const channel = supabase.channel(`${game}:${code}`, {
     config: { broadcast: { self: false, ack: false }, presence: { key: me } },

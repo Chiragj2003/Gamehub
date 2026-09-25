@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { createClient as createBrowserClient } from "@/lib/supabase/client";
+import { getSupabase } from "@/lib/supabase/client";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { CATALOG_GAMES, type Game } from "./catalog";
@@ -13,7 +13,7 @@ export type { Game } from "./catalog";
 // Helper to choose the right client depending on whether execution is client-side or server-side
 async function getSupabaseClient() {
   if (typeof window !== "undefined") {
-    return createBrowserClient();
+    return await getSupabase();
   }
   return await createServerClient();
 }

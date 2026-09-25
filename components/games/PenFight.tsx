@@ -20,6 +20,7 @@ import {
 } from "./penfight/physics";
 import { chooseFlick, type Flick } from "./penfight/ai";
 import { PenScene, SIDE_COLORS, type AimGizmo } from "./penfight/scene";
+import { displayFont } from "./penfight/font";
 
 /**
  * Pen Fight — the school-desk game. Flick your pens into the other side's and
@@ -827,7 +828,10 @@ export const ClassicPenFight: React.FC<GameProps> = ({ onGameOver }) => {
     : "";
   const label = (side: Side) => (h ? (h.mode === "cpu" ? (side === 0 ? "You" : "CPU") : h.mode === "local" ? `P${side + 1}` : side === h.mySide ? "You" : "Rival") : "");
   return (
-    <div ref={containerRef} className="pf-root relative h-full w-full select-none overflow-hidden bg-[#0b0a10]">
+    <div
+      ref={containerRef}
+      className={`pf-root ${displayFont.variable} relative h-full w-full select-none overflow-hidden bg-[#0b0a10]`}
+    >
       <canvas
         ref={canvasRef}
         className="block h-full w-full touch-none"

@@ -9,14 +9,13 @@ import Footer from "@/components/Footer";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { UserCircleIcon, ArrowLeft01Icon } from "@hugeicons/core-free-icons";
-import { createClient } from "@/lib/supabase/client";
+import { getSupabase } from "@/lib/supabase/client";
 import { useLibrary } from "@/lib/library";
 
 type Notice = { kind: "ok" | "error"; text: string } | null;
 
 export default function AccountPage() {
   const router = useRouter();
-  const supabase = createClient();
   const { ids } = useLibrary();
 
   const [user, setUser] = useState<User | null | undefined>(undefined);
@@ -29,8 +28,9 @@ export default function AccountPage() {
   const [delBusy, setDelBusy] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    getSupabase()
+      .then((supabase) => supabase.auth.getUser())
+      .then(({ data }) => setUser(data.user ?? null));
   }, []);
 
   const changePassword = async (e: React.FormEvent) => {
@@ -39,6 +39,7 @@ export default function AccountPage() {
     if (password.length < 8) return setPwNotice({ kind: "error", text: "Use at least 8 characters." });
     if (password !== password2) return setPwNotice({ kind: "error", text: "The two passwords don't match." });
     setPwBusy(true);
+    const supabase = await getSupabase();
     const { error } = await supabase.auth.updateUser({ password });
     setPwBusy(false);
     if (error) return setPwNotice({ kind: "error", text: error.message });
@@ -48,6 +49,7 @@ export default function AccountPage() {
   };
 
   const signOut = async () => {
+    const supabase = await getSupabase();
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
@@ -71,7 +73,7 @@ export default function AccountPage() {
       } catch {
         // ignore
       }
-      await supabase.auth.signOut().catch(() => {});
+      await (await getSupabase()).auth.signOut().catch(() => {});
       router.push("/?deleted=1");
       router.refresh();
     } catch (err) {

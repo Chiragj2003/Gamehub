@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { getSupabase } from "@/lib/supabase/client";
 
 /**
  * The player's saved games.
@@ -42,7 +42,6 @@ export function useLibrary() {
 
   // Track auth, and pull the server copy when a user is present.
   useEffect(() => {
-    const supabase = createClient();
     let cancelled = false;
 
     const syncFromServer = async (uid: string) => {
@@ -81,19 +80,31 @@ export function useLibrary() {
       }
     };
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (cancelled) return;
-      const uid = data.user?.id ?? null;
-      setUserId(uid);
-      setIds(readLocal());
-      setReady(true);
-      if (uid) syncFromServer(uid);
-    });
+    let unsubscribe: (() => void) | undefined;
+    // Show what is on the device straight away; the account copy follows once
+    // the auth library has loaded, so nothing waits on that download.
+    setIds(readLocal());
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      const uid = session?.user?.id ?? null;
-      setUserId(uid);
-      if (uid) syncFromServer(uid);
+    getSupabase().then((supabase) => {
+      if (cancelled) return;
+      supabase.auth.getUser().then(({ data }) => {
+        if (cancelled) return;
+        const uid = data.user?.id ?? null;
+        setUserId(uid);
+        setIds(readLocal());
+        setReady(true);
+        if (uid) syncFromServer(uid);
+      });
+
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+        const uid = session?.user?.id ?? null;
+        setUserId(uid);
+        if (uid) syncFromServer(uid);
+      });
+      unsubscribe = () => sub.subscription.unsubscribe();
+    }).catch(() => {
+      // Auth could not load: the device list is all there is, and it is ready.
+      if (!cancelled) setReady(true);
     });
 
     const onChange = () => setIds(readLocal());
@@ -101,7 +112,7 @@ export function useLibrary() {
 
     return () => {
       cancelled = true;
-      sub.subscription.unsubscribe();
+      unsubscribe?.();
       window.removeEventListener(EVENT, onChange);
     };
   }, []);

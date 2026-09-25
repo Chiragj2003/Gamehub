@@ -7,7 +7,7 @@ import Footer from "@/components/Footer";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { LockKeyIcon } from "@hugeicons/core-free-icons";
-import { createClient } from "@/lib/supabase/client";
+import { getSupabase } from "@/lib/supabase/client";
 
 /**
  * Landing page for the password-reset email. The link signs the user in via
@@ -15,7 +15,6 @@ import { createClient } from "@/lib/supabase/client";
  */
 export default function ResetPasswordPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [ready, setReady] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
@@ -23,8 +22,9 @@ export default function ResetPasswordPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setReady(!!data.user));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    getSupabase()
+      .then((supabase) => supabase.auth.getUser())
+      .then(({ data }) => setReady(!!data.user));
   }, []);
 
   const submit = async (e: React.FormEvent) => {
@@ -33,6 +33,7 @@ export default function ResetPasswordPage() {
     if (password.length < 8) return setError("Use at least 8 characters.");
     if (password !== password2) return setError("The two passwords don't match.");
     setBusy(true);
+    const supabase = await getSupabase();
     const { error } = await supabase.auth.updateUser({ password });
     setBusy(false);
     if (error) return setError(error.message);

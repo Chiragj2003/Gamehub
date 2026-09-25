@@ -3,8 +3,8 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { User } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
+import { getSupabase } from "@/lib/supabase/client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,9 +23,8 @@ interface UserMenuProps {
 
 export default function UserMenu({ user }: UserMenuProps) {
   const router = useRouter();
-  const supabase = createClient();
-
   const handleSignOut = async () => {
+    const supabase = await getSupabase();
     await supabase.auth.signOut();
     router.refresh();
   };
