@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getSupabase } from "@/lib/supabase/client";
+import { usePlayer } from "@/components/PlayerProvider";
 
 /**
  * The player's saved games.
@@ -36,8 +36,8 @@ function writeLocal(ids: number[]) {
 }
 
 export function useLibrary() {
+  const { userId, ready: playerReady } = usePlayer();
   const [ids, setIds] = useState<number[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
   // Track auth, and pull the server copy when a user is present.
@@ -80,42 +80,22 @@ export function useLibrary() {
       }
     };
 
-    let unsubscribe: (() => void) | undefined;
-    // Show what is on the device straight away; the account copy follows once
-    // the auth library has loaded, so nothing waits on that download.
+    // Show what is on the device straight away, then reconcile with the
+    // account copy once Clerk has said who is signed in.
     setIds(readLocal());
 
-    getSupabase().then((supabase) => {
-      if (cancelled) return;
-      supabase.auth.getUser().then(({ data }) => {
-        if (cancelled) return;
-        const uid = data.user?.id ?? null;
-        setUserId(uid);
-        setIds(readLocal());
-        setReady(true);
-        if (uid) syncFromServer(uid);
-      });
-
-      const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-        const uid = session?.user?.id ?? null;
-        setUserId(uid);
-        if (uid) syncFromServer(uid);
-      });
-      unsubscribe = () => sub.subscription.unsubscribe();
-    }).catch(() => {
-      // Auth could not load: the device list is all there is, and it is ready.
-      if (!cancelled) setReady(true);
-    });
+    if (!playerReady) return;
+    setReady(true);
+    if (userId) syncFromServer(userId);
 
     const onChange = () => setIds(readLocal());
     window.addEventListener(EVENT, onChange);
 
     return () => {
       cancelled = true;
-      unsubscribe?.();
       window.removeEventListener(EVENT, onChange);
     };
-  }, []);
+  }, [userId, playerReady]);
 
   const has = useCallback((gameId: number) => ids.includes(gameId), [ids]);
 

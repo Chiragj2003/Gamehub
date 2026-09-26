@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { auth, clerkClient } from "@clerk/nextjs/server";
+import { deleteProfile } from "@/lib/profile";
+import { isClerkConfigured } from "@/lib/clerk";
 import { rateLimiter, getClientKey } from "@/lib/rate-limit";
 
 /**
  * The signed-in user's account.
  *
- * DELETE removes the auth user; the profile and library rows go with it via
- * ON DELETE CASCADE. Leaderboard entries are not linked to accounts (three
- * initials and a score only), so there is nothing else to remove. Identity
- * comes from the session cookie; the body must carry the literal confirmation
- * so a stray request cannot delete an account.
+ * DELETE removes the player's own data — their tag and their saved library —
+ * and then the Clerk account itself. Leaderboard entries are deliberately left
+ * behind: they are a name and a score, not personal data, and removing them
+ * would punch holes in everyone else's rankings.
+ *
+ * Identity comes from Clerk; the body must carry the literal confirmation so a
+ * stray request cannot delete an account.
  */
 export async function DELETE(request: Request) {
   try {
@@ -19,29 +22,24 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Too many requests. Please wait a moment." }, { status: 429 });
     }
 
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
-    if (!user) return NextResponse.json({ error: "Sign in to manage your account" }, { status: 401 });
+    if (!isClerkConfigured) {
+      return NextResponse.json({ error: "Accounts are not enabled on this deployment." }, { status: 503 });
+    }
+
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Sign in to manage your account" }, { status: 401 });
 
     const body = await request.json().catch(() => ({}));
     if (body?.confirm !== "DELETE") {
       return NextResponse.json({ error: "Confirmation missing" }, { status: 400 });
     }
 
-    const admin = createAdminClient();
-    if (!admin) {
-      return NextResponse.json(
-        { error: "Account deletion is not enabled on this deployment. Set SUPABASE_SERVICE_ROLE_KEY." },
-        { status: 503 }
-      );
-    }
+    // Player rows first: if deleting the Clerk user succeeded and this failed,
+    // the rows would be orphaned with no account left to clean them up.
+    await deleteProfile(userId);
 
-    const { error } = await admin.auth.admin.deleteUser(user.id);
-    if (error) throw new Error(error.message);
-
-    // Clear the session cookie for the now-deleted user.
-    await supabase.auth.signOut();
+    const clerk = await clerkClient();
+    await clerk.users.deleteUser(userId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

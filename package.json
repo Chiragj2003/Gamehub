@@ -15,6 +15,7 @@
     "seed:sql": "npx tsx scripts/gen-seed-sql.ts"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.9.7",
     "@hugeicons/core-free-icons": "^4.2.0",
     "@hugeicons/react": "^1.1.6",
     "@neondatabase/serverless": "^1.1.0",

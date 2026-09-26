@@ -3,8 +3,12 @@
 import React, { useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { SparklesIcon, CheckmarkCircle01Icon, Share01Icon } from "@hugeicons/core-free-icons";
+import { SignInButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { saveLocalScore } from "@/lib/localScores";
+import { usePlayer } from "@/components/PlayerProvider";
+import { isClerkConfigured } from "@/lib/clerk";
+import TagEditor from "@/components/TagEditor";
 
 interface ScoreSubmitProps {
   gameId: number;
@@ -26,15 +30,19 @@ export default function ScoreSubmit({
   onClose,
   onPlayAgain,
 }: ScoreSubmitProps) {
+  const { userId, tag } = usePlayer();
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** A tag if you have one, otherwise the initials you just typed. */
+  const submitAs = tag ?? name.trim().toUpperCase();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanName = name.trim().toUpperCase();
+    const cleanName = submitAs;
     if (cleanName.length < 3) return;
 
     setSubmitting(true);
@@ -101,26 +109,60 @@ export default function ScoreSubmit({
 
         {!submitted ? (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label
-                htmlFor="initials"
-                className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3"
-              >
-                Enter initials (3 letters)
-              </label>
-              <input
-                type="text"
-                id="initials"
-                maxLength={3}
-                value={name}
-                onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
-                placeholder="AAA"
-                autoFocus
-                required
-                className="h-12 w-full rounded-2xl border border-line bg-muted px-4 text-center font-mono text-xl font-bold uppercase tracking-[0.3em] text-ink transition-all focus:border-brand focus:outline-none"
-                disabled={submitting}
-              />
-            </div>
+            {tag ? (
+              /* You have a tag: nothing to type, just confirm who is posting. */
+              <div className="space-y-1.5">
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3">
+                  Posting as
+                </span>
+                <p className="flex h-12 w-full items-center justify-center rounded-2xl border border-line bg-muted px-4 font-mono text-lg font-bold text-ink">
+                  {tag}
+                </p>
+              </div>
+            ) : userId ? (
+              /* Signed in but no tag yet — claiming one here is the fastest
+                 place to do it, and the score goes up under it. */
+              <div className="space-y-1.5">
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3">
+                  Claim your tag
+                </span>
+                <p className="text-[12.5px] leading-relaxed text-ink-2">
+                  Pick the name you want on the leaderboards. You only do this once.
+                </p>
+                <TagEditor autoFocus />
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="initials"
+                  className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3"
+                >
+                  Enter initials (3 letters)
+                </label>
+                <input
+                  type="text"
+                  id="initials"
+                  maxLength={3}
+                  value={name}
+                  onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
+                  placeholder="AAA"
+                  autoFocus
+                  required
+                  className="h-12 w-full rounded-2xl border border-line bg-muted px-4 text-center font-mono text-xl font-bold uppercase tracking-[0.3em] text-ink transition-all focus:border-brand focus:outline-none"
+                  disabled={submitting}
+                />
+                {isClerkConfigured && (
+                  <p className="pt-1 text-center text-[12px] text-ink-3">
+                    <SignInButton mode="modal">
+                      <button type="button" className="cursor-pointer font-semibold text-brand underline-offset-2 hover:underline">
+                        Sign in
+                      </button>
+                    </SignInButton>{" "}
+                    to play under a proper name instead.
+                  </p>
+                )}
+              </div>
+            )}
 
             {error && (
               <p
@@ -144,7 +186,7 @@ export default function ScoreSubmit({
               <Button
                 type="submit"
                 className="btn-glow h-11 flex-1 rounded-full text-[14px] font-semibold"
-                disabled={name.trim().length < 3 || submitting}
+                disabled={submitAs.length < 3 || submitting}
               >
                 {submitting ? "Submitting…" : "Submit score"}
               </Button>

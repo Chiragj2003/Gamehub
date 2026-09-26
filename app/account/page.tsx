@@ -1,95 +1,182 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { User } from "@supabase/supabase-js";
+import { SignInButton, useClerk, useUser } from "@clerk/nextjs";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { UserCircleIcon, ArrowLeft01Icon } from "@hugeicons/core-free-icons";
-import { getSupabase } from "@/lib/supabase/client";
+import TagEditor from "@/components/TagEditor";
 import { useLibrary } from "@/lib/library";
+import { isClerkConfigured } from "@/lib/clerk";
 
 type Notice = { kind: "ok" | "error"; text: string } | null;
 
-export default function AccountPage() {
+/**
+ * Your account: who you are signed in as, the tag you play under, and the
+ * controls to leave.
+ *
+ * Passwords, email and sign-out are Clerk's to own now — its own UI handles
+ * those far better than a hand-rolled form, and it keeps this page about the
+ * one thing that is ours: the player tag.
+ */
+/**
+ * The signed-in body of the page.
+ *
+ * Split out because Clerk's hooks throw when no ClerkProvider is above them,
+ * and with accounts switched off there isn't one. A hook cannot be called
+ * conditionally, but a component can be rendered conditionally.
+ */
+function ClerkAccount() {
   const router = useRouter();
+  const { isLoaded, isSignedIn, user } = useUser();
+  const { signOut, openUserProfile } = useClerk();
   const { ids } = useLibrary();
 
-  const [user, setUser] = useState<User | null | undefined>(undefined);
-  const [password, setPassword] = useState("");
-  const [password2, setPassword2] = useState("");
-  const [pwNotice, setPwNotice] = useState<Notice>(null);
-  const [pwBusy, setPwBusy] = useState(false);
   const [confirm, setConfirm] = useState("");
-  const [delNotice, setDelNotice] = useState<Notice>(null);
-  const [delBusy, setDelBusy] = useState(false);
-
-  useEffect(() => {
-    getSupabase()
-      .then((supabase) => supabase.auth.getUser())
-      .then(({ data }) => setUser(data.user ?? null));
-  }, []);
-
-  const changePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPwNotice(null);
-    if (password.length < 8) return setPwNotice({ kind: "error", text: "Use at least 8 characters." });
-    if (password !== password2) return setPwNotice({ kind: "error", text: "The two passwords don't match." });
-    setPwBusy(true);
-    const supabase = await getSupabase();
-    const { error } = await supabase.auth.updateUser({ password });
-    setPwBusy(false);
-    if (error) return setPwNotice({ kind: "error", text: error.message });
-    setPassword("");
-    setPassword2("");
-    setPwNotice({ kind: "ok", text: "Password changed." });
-  };
-
-  const signOut = async () => {
-    const supabase = await getSupabase();
-    await supabase.auth.signOut();
-    router.push("/");
-    router.refresh();
-  };
+  const [notice, setNotice] = useState<Notice>(null);
+  const [busy, setBusy] = useState(false);
 
   const deleteAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    setDelNotice(null);
-    setDelBusy(true);
+    setNotice(null);
+    setBusy(true);
     try {
       const res = await fetch("/api/user", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm }),
+        body: JSON.stringify({ confirm: "DELETE" }),
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(data.error || "Could not delete the account.");
-      // The server cleared the session; drop any local account cache too.
-      try {
-        localStorage.removeItem("game_hub_library_merged_for");
-      } catch {
-        // ignore
-      }
-      await (await getSupabase()).auth.signOut().catch(() => {});
-      router.push("/?deleted=1");
+      router.push("/");
       router.refresh();
     } catch (err) {
-      setDelNotice({ kind: "error", text: err instanceof Error ? err.message : "Could not delete the account." });
-      setDelBusy(false);
+      setNotice({ kind: "error", text: err instanceof Error ? err.message : "Could not delete the account." });
+      setBusy(false);
     }
   };
 
-  const provider = user?.app_metadata?.provider ?? "email";
-  const joined = user?.created_at ? new Date(user.created_at).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }) : null;
+  if (!isLoaded) return null;
 
+  if (!isSignedIn) {
+    return (
+      <GlassCard className="mt-8 text-center">
+        <h2 className="text-[17px] font-bold text-ink">Sign in to claim a tag</h2>
+        <p className="mx-auto mt-2 max-w-sm text-[14px] leading-relaxed text-ink-2">
+          An account gets you a name on the leaderboards instead of three initials, and a library that
+          follows you between devices.
+        </p>
+        <SignInButton mode="modal">
+          <button type="button" className="btn-glow mt-5 h-11 cursor-pointer rounded-full px-6 text-[14px] font-semibold">
+            Sign in
+          </button>
+        </SignInButton>
+      </GlassCard>
+    );
+  }
+
+  return (
+    <div className="mt-8 space-y-6">
+      <GlassCard>
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-ink-2">
+            <HugeiconsIcon icon={UserCircleIcon} className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-[17px] font-bold text-ink">Signed in as</h2>
+            <p className="truncate text-[13.5px] text-ink-2">
+              {user?.primaryEmailAddress?.emailAddress ?? user?.username ?? "your account"}
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => openUserProfile()}
+            className="btn-quiet h-10 cursor-pointer rounded-full px-4 text-[13px] font-semibold"
+          >
+            Email and password
+          </button>
+          <button
+            type="button"
+            onClick={() => signOut({ redirectUrl: "/" })}
+            className="btn-quiet h-10 cursor-pointer rounded-full px-4 text-[13px] font-semibold"
+          >
+            Sign out
+          </button>
+        </div>
+      </GlassCard>
+
+      <GlassCard>
+        <h2 className="text-[17px] font-bold text-ink">Your tag</h2>
+        <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-2">
+          This is the name on every leaderboard you reach. It has to be unique, and you can change it
+          whenever you like.
+        </p>
+        <TagEditor />
+      </GlassCard>
+
+      <GlassCard>
+        <h2 className="text-[17px] font-bold text-ink">Library</h2>
+        <p className="mt-1.5 text-[13.5px] text-ink-2">
+          {ids.length === 0
+            ? "You have not saved any games yet."
+            : `${ids.length} saved ${ids.length === 1 ? "game" : "games"}, synced to this account.`}
+        </p>
+        <Link
+          href="/library"
+          className="btn-quiet mt-4 inline-flex h-10 items-center rounded-full px-4 text-[13px] font-semibold"
+        >
+          Open library
+        </Link>
+      </GlassCard>
+
+      <GlassCard>
+        <h2 className="text-[17px] font-bold text-danger">Delete account</h2>
+        <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-2">
+          This removes your account, your tag and your saved games, and cannot be undone. Scores already on
+          the leaderboards stay — they are a name and a number, and pulling them would leave gaps in
+          everyone else&apos;s rankings.
+        </p>
+        <form onSubmit={deleteAccount} className="mt-5 space-y-3">
+          <label htmlFor="confirm-delete" className="block text-[13px] font-medium text-ink-2">
+            Type DELETE to confirm
+          </label>
+          <input
+            id="confirm-delete"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="DELETE"
+            autoComplete="off"
+            className="h-11 w-full rounded-xl border border-line bg-surface px-3.5 font-mono text-[14px] text-ink outline-none focus:border-danger"
+          />
+          <button
+            type="submit"
+            disabled={confirm !== "DELETE" || busy}
+            className="h-11 w-full cursor-pointer rounded-xl border border-danger/30 bg-danger/10 text-[13px] font-bold uppercase tracking-wider text-danger transition-colors hover:bg-danger/20 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy ? "Deleting…" : "Delete my account"}
+          </button>
+          {notice && (
+            <p role="alert" className={`text-[12.5px] ${notice.kind === "error" ? "text-danger" : "text-success"}`}>
+              {notice.text}
+            </p>
+          )}
+        </form>
+      </GlassCard>
+    </div>
+  );
+}
+
+export default function AccountPage() {
   return (
     <>
       <Navbar />
-
-      <main className="flex-1 pb-24 pt-10">
+      <main className="flex-1 pb-24 pt-8 sm:pt-10">
         <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8">
           <Link
             href="/"
@@ -99,138 +186,21 @@ export default function AccountPage() {
             All games
           </Link>
 
-          <div className="mb-10 space-y-3 text-center">
-            <div className="glass mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-brand">
-              <HugeiconsIcon icon={UserCircleIcon} className="h-7 w-7" />
-            </div>
-            <h1 className="text-[40px] font-black tracking-[-0.04em] text-ink sm:text-[56px]">Account</h1>
-            <p className="mx-auto max-w-md text-[15px] leading-relaxed text-ink-2">
-              Your sign-in, your library, and the option to leave.
-            </p>
-          </div>
+          <h1 className="text-[40px] font-black tracking-[-0.04em] text-ink sm:text-[56px]">Account</h1>
 
-          {user === undefined ? (
-            <GlassCard className="p-8">
-              <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
-            </GlassCard>
-          ) : user === null ? (
-            <GlassCard className="space-y-4 p-8 text-center">
-              <p className="text-[15px] text-ink">You&apos;re not signed in.</p>
-              <p className="text-[14px] text-ink-2">
-                Use the account icon in the header to sign in or create an account. Without one, your library and best
-                scores live on this device only.
+          {isClerkConfigured ? (
+            <ClerkAccount />
+          ) : (
+            <GlassCard className="mt-8">
+              <h2 className="text-[17px] font-bold text-ink">Accounts are off</h2>
+              <p className="mt-2 text-[14px] leading-relaxed text-ink-2">
+                This deployment has no account service configured. Every game still plays, and your scores and saved
+                games are kept on this device.
               </p>
             </GlassCard>
-          ) : (
-            <div className="space-y-6">
-              <GlassCard className="p-8">
-                <h2 className="text-[17px] font-bold text-ink">Signed in as</h2>
-                <dl className="mt-4 grid grid-cols-1 gap-4 text-[14px] sm:grid-cols-3">
-                  <div>
-                    <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3">Email</dt>
-                    <dd className="mt-1 break-all font-medium text-ink">{user.email}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3">Sign-in</dt>
-                    <dd className="mt-1 font-medium capitalize text-ink">{provider}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-3">Since</dt>
-                    <dd className="mt-1 font-medium text-ink">{joined ?? "—"}</dd>
-                  </div>
-                </dl>
-                <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-line pt-5 text-[14px]">
-                  <span className="text-ink-2">
-                    <span className="font-semibold text-ink">{ids.length}</span> {ids.length === 1 ? "game" : "games"} in your library
-                  </span>
-                  <Link href="/library" className="font-medium text-brand underline-offset-4 hover:underline">
-                    Open library
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={signOut}
-                    className="btn-quiet ml-auto h-9 cursor-pointer rounded-full px-4 text-[13px] font-semibold"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              </GlassCard>
-
-              {provider === "email" && (
-                <GlassCard className="p-8">
-                  <h2 className="text-[17px] font-bold text-ink">Change password</h2>
-                  <form onSubmit={changePassword} className="mt-4 space-y-3">
-                    <input
-                      type="password"
-                      autoComplete="new-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="New password"
-                      aria-label="New password"
-                      className="h-11 w-full rounded-2xl border border-line bg-muted px-4 text-[15px] text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
-                    />
-                    <input
-                      type="password"
-                      autoComplete="new-password"
-                      value={password2}
-                      onChange={(e) => setPassword2(e.target.value)}
-                      placeholder="Repeat new password"
-                      aria-label="Repeat new password"
-                      className="h-11 w-full rounded-2xl border border-line bg-muted px-4 text-[15px] text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none"
-                    />
-                    {pwNotice && (
-                      <p role="status" className={`text-[13px] font-medium ${pwNotice.kind === "ok" ? "text-success" : "text-danger"}`}>
-                        {pwNotice.text}
-                      </p>
-                    )}
-                    <button
-                      type="submit"
-                      disabled={pwBusy || !password}
-                      className="btn-glow h-10 cursor-pointer rounded-full px-5 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {pwBusy ? "Saving…" : "Save password"}
-                    </button>
-                  </form>
-                </GlassCard>
-              )}
-
-              <GlassCard className="border-danger/25 p-8">
-                <h2 className="text-[17px] font-bold text-danger">Delete account</h2>
-                <p className="mt-2 text-[14px] leading-relaxed text-ink-2">
-                  This removes your email, your sign-in, and your saved library — permanently. Leaderboard entries are
-                  not linked to accounts (three initials and a score), so they stay. Scores saved on this device stay
-                  in this browser.
-                </p>
-                <form onSubmit={deleteAccount} className="mt-5 space-y-3">
-                  <label htmlFor="confirm" className="block text-[12px] font-medium text-ink-2">
-                    Type <span className="font-mono font-bold text-ink">DELETE</span> to confirm
-                  </label>
-                  <input
-                    id="confirm"
-                    value={confirm}
-                    onChange={(e) => setConfirm(e.target.value.toUpperCase())}
-                    autoComplete="off"
-                    className="h-11 w-full rounded-2xl border border-line bg-muted px-4 font-mono text-[15px] uppercase tracking-[0.2em] text-ink focus:border-danger focus:outline-none sm:max-w-xs"
-                  />
-                  {delNotice && (
-                    <p role="alert" className="text-[13px] font-medium text-danger">
-                      {delNotice.text}
-                    </p>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={confirm !== "DELETE" || delBusy}
-                    className="pressable h-10 cursor-pointer rounded-full bg-danger px-5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {delBusy ? "Deleting…" : "Delete my account"}
-                  </button>
-                </form>
-              </GlassCard>
-            </div>
           )}
         </div>
       </main>
-
       <Footer />
     </>
   );

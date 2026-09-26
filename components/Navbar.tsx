@@ -1,24 +1,21 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Search01Icon, Menu01Icon, UserCircleIcon } from "@hugeicons/core-free-icons";
+import { Search01Icon, Menu01Icon } from "@hugeicons/core-free-icons";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader, SheetDescription } from "@/components/ui/sheet";
-import { getSupabase } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
 import ThemeToggle from "@/components/ThemeToggle";
 import SearchOverlay from "@/components/SearchOverlay";
+import { isClerkConfigured } from "@/lib/clerk";
 
 /**
- * The signed-in menu and the sign-in dialog are conditional UI that most
- * visits never render, and both pull in Radix overlays. Loading them on demand
- * keeps them — and the auth client behind them — off every page's first load.
+ * Clerk's widgets are conditional UI that a signed-out first visit never
+ * needs, so they load on demand rather than in every page's first bundle.
  */
-const UserMenu = dynamic(() => import("@/components/UserMenu"), { ssr: false });
-const AuthModal = dynamic(() => import("@/components/AuthModal"), { ssr: false });
+const AuthControls = dynamic(() => import("@/components/AuthControls"), { ssr: false });
 
 const NAV = [
   { name: "Games", href: "/" },
@@ -30,29 +27,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [authOpen, setAuthOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    let unsubscribe: (() => void) | undefined;
-    // Fetching the auth library here rather than importing it keeps ~240 KB
-    // off the critical path; the header renders signed-out and fills in.
-    getSupabase().then((supabase) => {
-      if (cancelled) return;
-      supabase.auth.getUser().then(({ data }) => {
-        if (!cancelled) setUser(data.user);
-      });
-      const { data: sub } = supabase.auth.onAuthStateChange((_e, session) =>
-        setUser(session?.user ?? null)
-      );
-      unsubscribe = () => sub.subscription.unsubscribe();
-    });
-    return () => {
-      cancelled = true;
-      unsubscribe?.();
-    };
-  }, []);
 
   return (
     <>
@@ -95,18 +70,7 @@ export default function Navbar() {
 
             <ThemeToggle />
 
-            {user ? (
-              <UserMenu user={user} />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setAuthOpen(true)}
-                aria-label="Sign in"
-                className="btn-quiet flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-ink-2 hover:text-ink"
-              >
-                <HugeiconsIcon icon={UserCircleIcon} className="h-4 w-4" />
-              </button>
-            )}
+            {isClerkConfigured && <AuthControls />}
 
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
@@ -167,7 +131,6 @@ export default function Navbar() {
       </header>
       <div className="h-16" aria-hidden="true" />
 
-      <AuthModal isOpen={authOpen} onOpenChange={setAuthOpen} />
       <SearchOverlay open={searchOpen} onOpenChange={setSearchOpen} />
     </>
   );

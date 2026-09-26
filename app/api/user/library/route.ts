@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@clerk/nextjs/server";
 import { queryUserLibraryIds, insertUserGame, deleteUserGame } from "@/lib/db-queries";
+import { isClerkConfigured } from "@/lib/clerk";
 
 /**
  * The signed-in user's saved games.
  *
- * Identity comes from the Supabase session cookie, never from the request
- * body: a client cannot read or edit anyone else's library by naming them.
+ * Identity comes from Clerk on the server, never from the request body: a
+ * client cannot read or edit anyone else's library by naming them.
  */
 async function currentUserId(): Promise<string | null> {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  return data.user?.id ?? null;
+  if (!isClerkConfigured) return null;
+  const { userId } = await auth();
+  return userId;
 }
 
 export async function GET() {

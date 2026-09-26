@@ -60,12 +60,13 @@ export function validateScore(input: ScoreSubmission): ValidationResult {
     return { ok: false, reason: "Player name is required" };
   }
 
-  // Arcade-style initials: letters and digits only, so the leaderboard cannot
-  // be used to display slurs, markup, or injected content.
-  const cleaned = playerName.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  // Either arcade initials from a signed-out player or the tag on an account.
+  // Letters, digits and underscores only, so the leaderboard cannot be used to
+  // display markup or injected content. Case is kept: a tag is a chosen name.
+  const cleaned = playerName.trim().replace(/[^A-Za-z0-9_]/g, "");
   if (cleaned.length === 0) {
     return { ok: false, reason: "Player name must contain letters or numbers" };
   }
 
-  return { ok: true, score, playerName: cleaned.slice(0, 3) };
+  return { ok: true, score, playerName: cleaned.slice(0, 16) };
 }

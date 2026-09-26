@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { getSupabase } from "@/lib/supabase/client";
+import { adminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { CATALOG_GAMES, type Game } from "./catalog";
@@ -315,7 +316,8 @@ export async function incrementGamePlayCount(id: number) {
 export async function queryUserLibraryIds(userId: string): Promise<number[]> {
   return await runQuery(
     async () => {
-      const supabase = await getSupabaseClient();
+      const supabase = adminClient();
+      if (!supabase) return [];
       const { data, error } = await supabase
         .from("user_games")
         .select("game_id")
@@ -330,7 +332,8 @@ export async function queryUserLibraryIds(userId: string): Promise<number[]> {
 export async function insertUserGame(userId: string, gameId: number): Promise<boolean> {
   if (databaseBreaker.isOpen()) return false;
   try {
-    const supabase = await getSupabaseClient();
+    const supabase = adminClient();
+    if (!supabase) return false;
     // Upsert on the (user, game) unique key so a double-tap is harmless.
     const { error } = await supabase
       .from("user_games")
@@ -347,7 +350,8 @@ export async function insertUserGame(userId: string, gameId: number): Promise<bo
 export async function deleteUserGame(userId: string, gameId: number): Promise<boolean> {
   if (databaseBreaker.isOpen()) return false;
   try {
-    const supabase = await getSupabaseClient();
+    const supabase = adminClient();
+    if (!supabase) return false;
     const { error } = await supabase
       .from("user_games")
       .delete()

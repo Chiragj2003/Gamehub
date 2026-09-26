@@ -1,21 +1,34 @@
 import "server-only";
-import { createClient } from "@supabase/supabase-js";
+
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { SUPABASE_URL } from "./config";
 import { timeoutFetch } from "./fetch";
 
 /**
- * Service-role client for the few operations row-level security cannot
- * express — deleting an auth user is the main one. Server-only by import
- * guard; the key must never reach a client bundle.
+ * The service-role client: the only way player data is read or written.
  *
- * Returns null when SUPABASE_SERVICE_ROLE_KEY is not configured so callers
- * can fail with a clear message instead of a 500.
+ * Identity now comes from Clerk, so the database has no Supabase session to
+ * derive `auth.uid()` from and row-level security cannot police per-user
+ * access. Instead nothing in the browser touches these tables at all — every
+ * read and write goes through a route handler that first asks Clerk who is
+ * calling, then uses this client. The tables have RLS on with no policies, so
+ * the anon key cannot reach them even if it leaks.
+ *
+ * `server-only` makes importing this from a client component a build error,
+ * which is the guard that matters: this key bypasses every rule.
  */
-export function createAdminClient() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key) return null;
-  return createClient(SUPABASE_URL, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+export const isAdminConfigured = serviceKey.length > 0;
+
+let cached: SupabaseClient | null = null;
+
+/** Null when the service-role key is unset, so callers degrade instead of throwing. */
+export function adminClient(): SupabaseClient | null {
+  if (!isAdminConfigured) return null;
+  cached ??= createClient(SUPABASE_URL, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
     global: { fetch: timeoutFetch },
   });
+  return cached;
 }

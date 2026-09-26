@@ -4,6 +4,9 @@ import "./globals.css";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import { SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
 import Aurora from "@/components/Aurora";
+import { ClerkProvider } from "@clerk/nextjs";
+import PlayerProvider from "@/components/PlayerProvider";
+import { isClerkConfigured } from "@/lib/clerk";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -53,7 +56,10 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return (
+  // Clerk throws when mounted without a publishable key, which would take the
+  // whole site down rather than just accounts. The site is playable signed
+  // out, so when the key is absent the provider simply is not there.
+  const page = (
     <html lang="en" className={`h-full antialiased ${inter.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <head>
         {/* Sets data-theme before first paint so there is no flash of the wrong theme. */}
@@ -69,9 +75,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </a>
         <Aurora />
         <div id="main" tabIndex={-1} className="flex min-h-full flex-1 flex-col outline-none">
-          {children}
+          <PlayerProvider>{children}</PlayerProvider>
         </div>
       </body>
     </html>
   );
+
+  return isClerkConfigured ? <ClerkProvider>{page}</ClerkProvider> : page;
 }
