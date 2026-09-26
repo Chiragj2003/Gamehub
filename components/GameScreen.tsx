@@ -5,7 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { PlayIcon, GamepadIcon, TimerIcon, FullScreenIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createPlaySession, type PlaySession } from "@/lib/session";
-import GameRenderer from "./GameRenderer";
+import GameRenderer, { gameAspect } from "./GameRenderer";
 import GameErrorBoundary from "./GameErrorBoundary";
 import ScoreSubmit from "./ScoreSubmit";
 
@@ -155,8 +155,11 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
       className={
         fullscreen
           ? "fixed inset-0 z-[60] flex flex-col bg-black"
-          : "relative flex w-full flex-col overflow-hidden rounded-3xl border border-line bg-[#0a0a0d] shadow-[var(--shadow-lift)] aspect-[4/3] max-h-[78vh] md:aspect-video"
+          : "relative flex w-full flex-col overflow-hidden rounded-3xl border border-line bg-[#0a0a0d] shadow-[var(--shadow-lift)] max-h-[78vh]"
       }
+      // Take the running game's own shape rather than a fixed 4:3 / 16:9, so
+      // the board fills the frame instead of sitting inside letterbox bars.
+      style={fullscreen ? undefined : { aspectRatio: String(gameAspect(gameSlug)) }}
     >
       <div className="relative z-20 flex h-10 shrink-0 items-center justify-between border-b border-white/10 bg-black/60 px-3 text-xs text-zinc-400 backdrop-blur-md sm:px-4">
         <div className="flex min-w-0 items-center gap-2">

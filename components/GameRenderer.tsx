@@ -57,3 +57,29 @@ export default function GameRenderer({ slug, onGameOver }: GameRendererProps) {
 }
 
 export const GAME_SLUGS = Object.keys(GAMES);
+
+/**
+ * The shape each game draws in, as width / height.
+ *
+ * The player used to be a fixed 4:3 box, 16:9 from md up, whatever the game
+ * inside it drew — so a 4:3 board lost a bar down each side and Dino's 2:1
+ * strip lost one top and bottom. Sizing the frame to the game instead gives
+ * the same screen over to the board: Snake gains about a third more area on a
+ * laptop.
+ *
+ * Kept beside the component map so adding a game means touching one file, and
+ * defaulted so forgetting an entry costs a little letterboxing, not a break.
+ */
+const DEFAULT_ASPECT = 4 / 3;
+
+const ASPECTS: Record<string, number> = {
+  dino: 800 / 400,
+  // 2048 is a DOM board that sizes itself; Pen Fight's renderer fills whatever
+  // box it is given. Both are happiest in a wide frame.
+  "2048": 4 / 3,
+  "pen-fight": 16 / 9,
+};
+
+export function gameAspect(slug: string): number {
+  return ASPECTS[slug] ?? DEFAULT_ASPECT;
+}

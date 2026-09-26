@@ -21,9 +21,25 @@ const DINO_H = 44;
 const DUCK_H = 24;
 
 const GRAVITY = 2400;
-const JUMP = -760;
-/** Holding jump after the apex lets the fall come sooner, for short hops. */
-const FAST_FALL = 2.2;
+const JUMP = -820;
+/**
+ * Releasing jump early cuts the rise short, so a tap is a hop and a hold is a
+ * full jump. The multiplier used to be 2.2 with no floor on the rise, which
+ * meant a quick tap climbed about 55px — less than the 66px a tall cactus
+ * reaches. Tapping, which is what most people do, could not clear the
+ * obstacle at all, and the jump read as sluggish rather than short.
+ */
+const FAST_FALL = 1.9;
+/**
+ * Full gravity for this long after take-off whatever the player does, so the
+ * shortest possible tap still clears anything the game spawns.
+ */
+const MIN_RISE = 0.12;
+/**
+ * A jump pressed this long before landing still fires on touchdown. Without
+ * it, pressing a fraction early does nothing and the input feels dropped.
+ */
+const JUMP_BUFFER = 0.13;
 
 const START_SPEED = 390;
 const MAX_SPEED = 820;
@@ -47,6 +63,10 @@ function initialState() {
   return {
     y: GROUND_Y,
     vy: 0,
+    /** Seconds since take-off, for the minimum-rise window. */
+    airTime: 0,
+    /** Counts down while an early jump press waits for the ground. */
+    jumpBuffer: 0,
     grounded: true,
     ducking: false,
     obstacles: [] as Obstacle[],
@@ -67,14 +87,20 @@ export const ClassicDino: React.FC<GameProps> = ({ onGameOver }) => {
   const onGameOverRef = useLatest(onGameOver);
   const stateRef = useRef(initialState());
 
+  const takeOff = (s: ReturnType<typeof initialState>) => {
+    s.vy = JUMP;
+    s.grounded = false;
+    s.airTime = 0;
+    s.jumpBuffer = 0;
+  };
+
   const jump = () => {
     const s = stateRef.current;
     if (s.over || s.paused) return;
     s.started = true;
-    if (s.grounded && !s.ducking) {
-      s.vy = JUMP;
-      s.grounded = false;
-    }
+    if (s.grounded && !s.ducking) takeOff(s);
+    // Mid-air: remember it, and fire the moment the feet touch down.
+    else s.jumpBuffer = JUMP_BUFFER;
   };
 
   const input = useGameInput({
@@ -117,13 +143,20 @@ export const ClassicDino: React.FC<GameProps> = ({ onGameOver }) => {
       if (!s.started) return;
 
       const holdingJump = io.isDown("primary") || io.isDown("up");
-      const g = !holdingJump && s.vy < 0 ? GRAVITY * FAST_FALL : GRAVITY;
+      // Cut the rise short only after the minimum-rise window, so the shortest
+      // tap still gets a usable jump.
+      if (!s.grounded) s.airTime += dt;
+      const cutRise = !holdingJump && s.vy < 0 && s.airTime > MIN_RISE;
+      const g = cutRise ? GRAVITY * FAST_FALL : GRAVITY;
       s.vy += g * dt;
       s.y += s.vy * dt;
+      if (s.jumpBuffer > 0) s.jumpBuffer -= dt;
       if (s.y >= GROUND_Y) {
         s.y = GROUND_Y;
         s.vy = 0;
         s.grounded = true;
+        // A jump pressed just before landing fires now rather than being lost.
+        if (s.jumpBuffer > 0 && !s.ducking) takeOff(s);
       }
 
       s.speed = Math.min(MAX_SPEED, s.speed + ACCEL * dt);
