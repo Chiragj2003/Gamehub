@@ -26,6 +26,8 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
   const [fullscreen, setFullscreen] = useState(false);
   const [portrait, setPortrait] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
+  /** The letterboxed area the canvas sits centred in, while fullscreen. */
+  const stageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -55,6 +57,83 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
     setFullscreen(false);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   }, []);
+
+  /**
+   * Fullscreen letterboxing, fixed.
+   *
+   * A landscape game (say 800x400) on a portrait phone is width-constrained,
+   * so the canvas fills the screen's width but only a fraction of its
+   * height — the rest of the fullscreen shell is empty black. Visually that
+   * whole shell reads as "the game", but every touch/mouse listener is
+   * attached to the canvas element itself, so a tap in that empty margin did
+   * nothing: exactly "tapping below" not registering.
+   *
+   * Fixed by forwarding: a touch or click that lands on the stage but misses
+   * the canvas is re-dispatched as the same event, targeted at the canvas,
+   * at the same coordinates. The game's own listeners then handle it exactly
+   * as if the tap had landed on the canvas — correct for every tap-to-jump or
+   * tap-to-flap game, and harmless for drag games, whose paddles already
+   * clamp to their own bounds.
+   */
+  useEffect(() => {
+    if (!fullscreen || !playing) return;
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const canvasEl = () => stage.querySelector("canvas");
+
+    const forwardTouch = (type: "touchstart" | "touchmove" | "touchend", e: TouchEvent, canvas: HTMLCanvasElement) => {
+      try {
+        const touches = Array.from(e.changedTouches).map(
+          (t) => new Touch({ identifier: t.identifier, target: canvas, clientX: t.clientX, clientY: t.clientY })
+        );
+        canvas.dispatchEvent(
+          new TouchEvent(type, {
+            touches: type === "touchend" ? [] : touches,
+            changedTouches: touches,
+            bubbles: true,
+            cancelable: true,
+          })
+        );
+      } catch {
+        // Touch/TouchEvent are unavailable on some browsers (desktop Safari);
+        // nothing to forward there since a real touch could not occur anyway.
+      }
+    };
+
+    const onTouch = (type: "touchstart" | "touchmove" | "touchend") => (e: TouchEvent) => {
+      const canvas = canvasEl();
+      if (!canvas || e.target === canvas) return; // a real hit already reached it
+      e.preventDefault();
+      forwardTouch(type, e, canvas);
+    };
+    const handleStart = onTouch("touchstart");
+    const handleMove = onTouch("touchmove");
+    const handleEnd = onTouch("touchend");
+
+    // Mouse, for a desktop pointer and for this project's own browser-driven
+    // tests: dispatching a native MouseEvent on the canvas reaches both a
+    // manually-attached listener and a React onMouseDown prop on it, since
+    // React's delegated listener sees any real event that reaches the node.
+    const onMouseDown = (e: MouseEvent) => {
+      const canvas = canvasEl();
+      if (!canvas || e.target === canvas) return;
+      canvas.dispatchEvent(new MouseEvent("mousedown", { clientX: e.clientX, clientY: e.clientY, bubbles: true, cancelable: true }));
+    };
+
+    stage.addEventListener("touchstart", handleStart, { passive: false });
+    stage.addEventListener("touchmove", handleMove, { passive: false });
+    stage.addEventListener("touchend", handleEnd, { passive: false });
+    stage.addEventListener("touchcancel", handleEnd, { passive: false });
+    stage.addEventListener("mousedown", onMouseDown);
+    return () => {
+      stage.removeEventListener("touchstart", handleStart);
+      stage.removeEventListener("touchmove", handleMove);
+      stage.removeEventListener("touchend", handleEnd);
+      stage.removeEventListener("touchcancel", handleEnd);
+      stage.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [fullscreen, playing, runKey]);
 
   // Esc or the system back gesture leaves real fullscreen without telling us.
   useEffect(() => {
@@ -195,7 +274,7 @@ export default function GameScreen({ gameId, gameTitle, gameSlug }: GameScreenPr
 
       {/* min-h-0 lets the flex item shrink so the canvas's max-height resolves;
           without it the canvas keeps its intrinsic size and overflows. */}
-      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-[#0a0a0d]">
+      <div ref={stageRef} className="relative flex min-h-0 flex-1 touch-none items-center justify-center bg-[#0a0a0d]">
         <GameErrorBoundary key={runKey} onReset={() => setRunKey((k) => k + 1)}>
           <GameRenderer key={runKey} slug={gameSlug} onGameOver={handleGameOver} />
         </GameErrorBoundary>

@@ -10,6 +10,7 @@ import {
   drawPauseOverlay,
   drawGameOverFlash,
 } from "@/lib/game-engine";
+import { WOLF_IDLE, WOLF_RUN, WOLF_BALL, drawWolfFrame, getWolfSheet, wolfSheetReady } from "./sprites/wolf";
 
 const WIDTH = 800;
 const HEIGHT = 400;
@@ -86,6 +87,7 @@ export const ClassicDino: React.FC<GameProps> = ({ onGameOver }) => {
   const { canvasRef, ctxRef } = useGameCanvas(WIDTH, HEIGHT);
   const onGameOverRef = useLatest(onGameOver);
   const stateRef = useRef(initialState());
+  const wolfImg = getWolfSheet();
 
   const takeOff = (s: ReturnType<typeof initialState>) => {
     s.vy = JUMP;
@@ -241,18 +243,23 @@ export const ClassicDino: React.FC<GameProps> = ({ onGameOver }) => {
         }
       }
 
-      const dinoH = s.ducking ? DUCK_H : DINO_H;
-      const dinoW = s.ducking ? DINO_W + 14 : DINO_W;
-      ctx.fillStyle = "#3b82f6";
-      ctx.fillRect(DINO_X, s.y - dinoH, dinoW, dinoH);
-      // Eye
-      ctx.fillStyle = "#09090b";
-      ctx.fillRect(DINO_X + dinoW - 12, s.y - dinoH + 8, 5, 5);
-      // Legs alternate while running on the ground.
-      if (s.grounded && s.started) {
-        const step = Math.floor(s.legPhase) % 2 === 0;
-        ctx.fillStyle = "#09090b";
-        ctx.fillRect(DINO_X + (step ? 6 : 22), s.y - 8, 8, 8);
+      // The wolf: idle before the first jump, tumbling through the air,
+      // curled low while ducking, or mid-stride on the ground. One shared
+      // draw call anchored at the paws (DINO_X + DINO_W/2, s.y) covers all
+      // four — only the frame, height and rotation change.
+      if (wolfSheetReady(wolfImg)) {
+        const footX = DINO_X + DINO_W / 2;
+        if (!s.started) {
+          drawWolfFrame(ctx, wolfImg, WOLF_IDLE, footX, s.y - DINO_H / 2, DINO_H);
+        } else if (!s.grounded) {
+          const frame = WOLF_BALL[Math.floor(s.airTime * 10) % WOLF_BALL.length];
+          drawWolfFrame(ctx, wolfImg, frame, footX, s.y - DINO_H / 2, DINO_H, s.airTime * 8);
+        } else if (s.ducking) {
+          drawWolfFrame(ctx, wolfImg, WOLF_BALL[0], footX, s.y - DUCK_H / 2, DUCK_H);
+        } else {
+          const frame = WOLF_RUN[Math.floor(s.legPhase) % WOLF_RUN.length];
+          drawWolfFrame(ctx, wolfImg, frame, footX, s.y - DINO_H / 2, DINO_H);
+        }
       }
 
       ctx.textAlign = "right";

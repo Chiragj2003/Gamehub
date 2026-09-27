@@ -10,6 +10,7 @@ import {
   drawPauseOverlay,
   drawGameOverFlash,
 } from "@/lib/game-engine";
+import { WOLF_HOWL, WOLF_BALL, drawWolfFrame, getWolfSheet, wolfSheetReady } from "./sprites/wolf";
 
 const WIDTH = 800;
 const HEIGHT = 600;
@@ -44,6 +45,8 @@ function initialState() {
     paused: false,
     over: false,
     reported: false,
+    /** Drives which wolf frame shows; advances every tick while flying. */
+    animPhase: 0,
   };
 }
 
@@ -51,6 +54,7 @@ export const ClassicFlappyBird: React.FC<GameProps> = ({ onGameOver }) => {
   const { canvasRef, ctxRef } = useGameCanvas(WIDTH, HEIGHT);
   const onGameOverRef = useLatest(onGameOver);
   const stateRef = useRef(initialState());
+  const wolfImg = getWolfSheet();
 
   const flap = () => {
     const s = stateRef.current;
@@ -98,6 +102,7 @@ export const ClassicFlappyBird: React.FC<GameProps> = ({ onGameOver }) => {
 
       s.bvy = Math.min(s.bvy + GRAVITY * dt, MAX_FALL);
       s.by += s.bvy * dt;
+      s.animPhase += dt * 10;
 
       if (s.by + BIRD_R >= HEIGHT || s.by - BIRD_R <= 0) {
         s.over = true;
@@ -161,22 +166,17 @@ export const ClassicFlappyBird: React.FC<GameProps> = ({ onGameOver }) => {
         ctx.strokeRect(p.x, bottomY, PIPE_W, HEIGHT - bottomY);
       }
 
-      // Bird tilts with its vertical velocity.
-      ctx.save();
-      ctx.translate(BIRD_X, s.by);
-      ctx.rotate(Math.max(-0.5, Math.min(0.9, s.bvy / 600)));
-      ctx.fillStyle = "#ec4899";
-      ctx.strokeStyle = "#f472b6";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(BIRD_R, 0);
-      ctx.lineTo(-BIRD_R, -BIRD_R / 1.5);
-      ctx.lineTo(-BIRD_R / 2, 0);
-      ctx.lineTo(-BIRD_R, BIRD_R / 1.5);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
+      // The wolf tilts with its vertical velocity, same as the bird it
+      // replaced: nose up freshly after a flap, nose down as it falls. Which
+      // pose rides that tilt changes with direction — head thrown back while
+      // a flap is still carrying it up, curled into a tumble once it isn't.
+      if (wolfSheetReady(wolfImg)) {
+        const rotate = Math.max(-0.5, Math.min(0.9, s.bvy / 600));
+        const rising = s.bvy < -40;
+        const frames = rising ? WOLF_HOWL : WOLF_BALL;
+        const frame = frames[Math.floor(s.animPhase) % frames.length];
+        drawWolfFrame(ctx, wolfImg, frame, BIRD_X, s.by, BIRD_R * 2.6, rotate);
+      }
 
       ctx.textAlign = "center";
       ctx.font = "bold 44px monospace";
